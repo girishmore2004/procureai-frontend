@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { StatCard, StatusBadge, PageLoader, EmptyState } from '../components/ui';
 import { ClipboardList, AlertTriangle, Clock, FileText, Plus, TrendingUp, Bell, CheckCircle } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { safeFormatDistanceToNow } from '../utils/date';
 
 export default function DashboardPage() {
   const { user, can } = useAuth();
