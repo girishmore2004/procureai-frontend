@@ -5,7 +5,7 @@ import { poApi } from '../api/services';
 import { Table, EmptyState, StatusBadge, PageLoader } from '../components/ui';
 import { Send, Download, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { formatDistanceToNow } from 'date-fns';
+import { safeFormatDistanceToNow } from '../utils/date';
 
 export function PurchaseOrdersPage() {
   const navigate = useNavigate();
@@ -26,7 +26,7 @@ export function PurchaseOrdersPage() {
             <td className="table-td">{po.Vendor?.name || '—'}</td>
             <td className="table-td font-semibold">₹{Number(po.total_amount || 0).toLocaleString('en-IN')}</td>
             <td className="table-td text-xs">{po.expected_delivery_date || '—'}</td>
-            <td className="table-td text-xs text-gray-500">{formatDistanceToNow(new Date(po.created_at), { addSuffix: true })}</td>
+            <td className="table-td text-xs text-gray-500">{safeFormatDistanceToNow(po.created_at, { addSuffix: true })}</td>
             <td className="table-td"><StatusBadge status={po.status} /></td>
           </tr>
         ))}
