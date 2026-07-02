@@ -49,7 +49,7 @@ export function InvoicesPage() {
               </div>
             </td>
             <td className="table-td"><StatusBadge status={inv.payment_status} /></td>
-            <<td className="table-td text-xs text-gray-500">{safeFormatDistanceToNow(inv.created_at, { addSuffix: true })}</td>
+            <td className="table-td text-xs text-gray-500">{safeFormatDistanceToNow(inv.created_at, { addSuffix: true })}</td>
           </tr>
         ))}
       </Table>
