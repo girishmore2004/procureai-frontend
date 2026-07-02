@@ -5,7 +5,7 @@ import { rfqApi, quotesApi } from '../api/services';
 import { Table, EmptyState, StatusBadge, Modal, Field, Alert, PageLoader, Spinner } from '../components/ui';
 import { Send, Bell, Star, CheckCircle, AlertTriangle, Bot, ThumbsUp } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { formatDistanceToNow } from 'date-fns';
+import { safeFormatDistanceToNow } from '../utils/date';
 
 // ── RFQ LIST ──────────────────────────────────────────────────────────────
 export function RfqsPage() {
@@ -149,7 +149,7 @@ export function QuoteInboxPage() {
               </div>
             </td>
             <td className="table-td font-semibold">{q.total_amount ? `₹${Number(q.total_amount).toLocaleString('en-IN')}` : '—'}</td>
-            <td className="table-td text-xs text-gray-500">{formatDistanceToNow(new Date(q.created_at), { addSuffix: true })}</td>
+            <td className="table-td text-xs text-gray-500">{safeFormatDistanceToNow(q.created_at, { addSuffix: true })}</td>
           </tr>
         ))}
       </Table>
