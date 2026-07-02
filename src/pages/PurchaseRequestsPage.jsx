@@ -5,7 +5,7 @@ import { prApi, itemsApi, rfqApi, vendorsApi } from '../api/services';
 import { Table, EmptyState, StatusBadge, Modal, Field, Pagination, Alert } from '../components/ui';
 import { Plus, Trash2, Send, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { formatDistanceToNow } from 'date-fns';
+import { safeFormatDistanceToNow } from '../utils/date';
 import { useAuth } from '../context/AuthContext';
 
 // ── LIST PAGE ──────────────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ export function PurchaseRequestsPage() {
             <td className="table-td">{pr.department || '—'}</td>
             <td className="table-td"><span className={`badge-${pr.priority === 'urgent' ? 'red' : pr.priority === 'high' ? 'amber' : 'gray'}`}>{pr.priority}</span></td>
             <td className="table-td font-semibold">₹{Number(pr.total_estimated_amount).toLocaleString('en-IN')}</td>
-            <td className="table-td text-xs text-gray-500">{formatDistanceToNow(new Date(pr.created_at), { addSuffix: true })}</td>
+            <td className="table-td text-xs text-gray-500">{safeFormatDistanceToNow(pr.created_at, { addSuffix: true })}</td>
             <td className="table-td"><StatusBadge status={pr.status} /></td>
           </tr>
         ))}
