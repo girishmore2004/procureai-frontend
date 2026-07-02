@@ -69,7 +69,7 @@ export default function ApprovalsPage() {
                     </p>
                     <p className="text-xs text-gray-500 mt-0.5">
                       ID: {ap.approvable_id?.slice(-8)} ·{' '}
-                      {formatDistanceToNow(new Date(ap.created_at), { addSuffix: true })}
+                      {safeFormatDistanceToNow(ap.created_at, { addSuffix: true })}
                     </p>
                     {ap.comments && (
                       <p className="text-sm text-gray-600 mt-1 italic">"{ap.comments}"</p>
