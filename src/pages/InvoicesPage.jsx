@@ -5,7 +5,7 @@ import { invoicesApi, vendorsApi, poApi } from '../api/services';
 import { Table, EmptyState, StatusBadge, PageLoader, Alert, Modal, Field } from '../components/ui';
 import { Upload, CheckCircle, GitMerge, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { formatDistanceToNow } from 'date-fns';
+import { safeFormatDistanceToNow } from '../utils/date';
 
 export function InvoicesPage() {
   const navigate = useNavigate();
@@ -49,7 +49,7 @@ export function InvoicesPage() {
               </div>
             </td>
             <td className="table-td"><StatusBadge status={inv.payment_status} /></td>
-            <td className="table-td text-xs text-gray-500">{formatDistanceToNow(new Date(inv.created_at), { addSuffix: true })}</td>
+            <<td className="table-td text-xs text-gray-500">{safeFormatDistanceToNow(inv.created_at, { addSuffix: true })}</td>
           </tr>
         ))}
       </Table>
