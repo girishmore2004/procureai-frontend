@@ -4,7 +4,7 @@ import { approvalsApi } from '../api/services';
 import { PageLoader, EmptyState, StatusBadge, Modal, Field } from '../components/ui';
 import { CheckCircle, XCircle, MessageSquare, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { formatDistanceToNow } from 'date-fns';
+import { safeFormatDistanceToNow } from '../utils/date';
 
 export default function ApprovalsPage() {
   const qc = useQueryClient();
