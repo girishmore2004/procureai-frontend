@@ -63,7 +63,7 @@ export default function DashboardPage() {
                 <Link key={pr.id} to={`/purchase-requests/${pr.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition border border-gray-100">
                   <div>
                     <p className="text-sm font-medium text-gray-800">{pr.pr_number}</p>
-                    <p className="text-xs text-gray-500">{pr.department} · {formatDistanceToNow(new Date(pr.created_at), { addSuffix: true })}</p>
+                    <p className="text-xs text-gray-500">{pr.department} · {safeFormatDistanceToNow(pr.created_at, { addSuffix: true })}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-semibold text-gray-700">₹{Number(pr.total_estimated_amount).toLocaleString('en-IN')}</span>
@@ -87,7 +87,7 @@ export default function DashboardPage() {
                 <div key={ap.id} className="flex items-center justify-between p-3 rounded-lg border border-amber-100 bg-amber-50">
                   <div>
                     <p className="text-sm font-medium text-gray-800 capitalize">{ap.approvable_type?.replace(/_/g, ' ')}</p>
-                    <p className="text-xs text-gray-500">Level {ap.level} · {formatDistanceToNow(new Date(ap.created_at), { addSuffix: true })}</p>
+                    <p className="text-xs text-gray-500">Level {ap.level} · {safeFormatDistanceToNow(ap.created_at, { addSuffix: true })}</p>
                   </div>
                   <Link to="/approvals" className="text-xs text-brand-600 font-medium hover:underline">Review →</Link>
                 </div>
