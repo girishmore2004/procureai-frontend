@@ -74,8 +74,8 @@ export const Table = ({ headers, children, loading, empty }) => (
       <tbody className="divide-y divide-gray-100">
         {loading ? (
           <tr><td colSpan={headers.length} className="py-12 text-center"><Spinner /></td></tr>
-        ) : children || (
-          <tr><td colSpan={headers.length}>{empty}</td></tr>
+        ) : (Array.isArray(children) ? children.length > 0 : children) ? children : (
+        <tr><td colSpan={headers.length}>{empty}</td></tr>
         )}
       </tbody>
     </table>
