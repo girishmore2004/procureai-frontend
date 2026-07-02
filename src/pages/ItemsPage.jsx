@@ -19,10 +19,15 @@ export function ItemsPage() {
   });
 
   const addMutation = useMutation({
-    mutationFn: itemsApi.create,
-    onSuccess: () => { toast.success('Item added'); qc.invalidateQueries(['items']); setAddOpen(false); },
-    onError: (e) => toast.error(e.response?.data?.error?.message || 'Failed'),
-  });
+  mutationFn: itemsApi.create,
+  onSuccess: () => {
+    toast.success('Item added');
+    qc.invalidateQueries({ queryKey: ['items'] });
+    setAddOpen(false);
+    setForm({ name: '', category: '', unit: '', brand: '', hsn_sac: '', tax_rate: '', reorder_level: '', safety_stock: '', avg_usage_per_month: '' });
+  },
+  onError: (e) => toast.error(e.response?.data?.error?.message || 'Failed'),
+});
 
   const items = data?.data || [];
   const meta = data?.meta || {};
