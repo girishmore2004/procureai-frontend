@@ -151,6 +151,7 @@ export function RfqDetailPage() {
         <div className="space-y-2">
           {rfq.rfqVendors?.map((rv) => {
             const extracting = (rv.Quotes || []).some((q) => IN_PROGRESS_STATUSES.includes(q.extraction_status));
+            const activeQuote = (rv.Quotes || []).find((q) => q.status !== 'superseded') || rv.Quotes?.[0];
             return (
               <div key={rv.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-lg bg-gray-50 flex-wrap gap-2">
                 <div>
@@ -170,7 +171,7 @@ export function RfqDetailPage() {
                       </a>
                     </>
                   )}
-                  {rv.Quotes?.length > 0 && <Link to={`/quotes/${rv.Quotes[0].id}`} className="text-xs text-brand-600 hover:underline">View Quote</Link>}
+                  {activeQuote && <Link to={`/quotes/${activeQuote.id}`} className="text-xs text-brand-600 hover:underline">View Quote</Link>}
                 </div>
               </div>
             );
