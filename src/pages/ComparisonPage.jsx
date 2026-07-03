@@ -131,17 +131,22 @@ export default function ComparisonPage() {
               { label: 'Valid Until', key: 'validity_date', format: (v) => v || '—' },
               { label: 'Vendor Rating', key: 'vendor', format: (v) => v?.rating ? `${Number(v.rating).toFixed(1)}/10` : 'New' },
             ].map((row) => {
+              // Only rows that explicitly declare a comparison direction (Total Amount,
+              // Landed Cost, Delivery Time) should get a "best value" checkmark. Rows like
+              // Valid Until, Payment Terms, and Vendor Rating aren't meant to be ranked this
+              // way — feeding a date string like "2026-07-10" through parseFloat() reads it
+              // as just 2026, so two different dates can tie and both get marked "best".
               const values = quotes.map((q) => row.key === 'vendor' ? q.vendor : q[row.key]);
-              const numVals = values.map((v) => parseFloat(v) || null).filter(Boolean);
-              const best = row.highlight === 'low' ? Math.min(...numVals) : Math.max(...numVals);
+              const numVals = row.highlight ? values.map((v) => parseFloat(v) || null).filter(Boolean) : [];
+              const best = row.highlight === 'low' ? Math.min(...numVals) : row.highlight ? Math.max(...numVals) : null;
 
               return (
                 <tr key={row.label} className="hover:bg-gray-50">
                   <td className="py-3 pr-4 text-sm font-medium text-gray-600">{row.label}</td>
                   {quotes.map((q) => {
                     const rawVal = row.key === 'vendor' ? q.vendor : q[row.key];
-                    const numVal = parseFloat(rawVal) || null;
-                    const isBest = numVal && numVal === best;
+                    const numVal = row.highlight ? (parseFloat(rawVal) || null) : null;
+                    const isBest = row.highlight && numVal && numVal === best;
                     return (
                       <td key={q.quote_id} className={`py-3 px-4 text-center text-sm ${q.ai_recommended ? 'bg-brand-50' : ''}`}>
                         <span className={isBest ? 'font-bold text-green-600' : 'text-gray-700'}>
