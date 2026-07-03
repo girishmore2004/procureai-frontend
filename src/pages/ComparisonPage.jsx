@@ -27,11 +27,12 @@ export default function ComparisonPage() {
 
   const selectMutation = useMutation({
     mutationFn: ({ quote_id, override_reason }) => rfqApi.selectVendor(id, { quote_id, override_reason }),
-    onSuccess: () => {
-      toast.success('Vendor selected! Creating Purchase Order…');
+    onSuccess: (res) => {
+      const { purchase_order_id, po_number } = res.data.data || {};
+      toast.success(po_number ? `Vendor selected — Purchase Order ${po_number} created` : 'Vendor selected! Purchase Order created');
       qc.invalidateQueries(['comparison', id]);
       setConfirmOpen(false);
-      navigate('/purchase-orders');
+      navigate(purchase_order_id ? `/purchase-orders/${purchase_order_id}` : '/purchase-orders');
     },
     onError: (e) => toast.error(e.response?.data?.error?.message || 'Failed'),
   });
