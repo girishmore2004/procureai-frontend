@@ -3,9 +3,21 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { rfqApi, quotesApi } from '../api/services';
 import { Table, EmptyState, StatusBadge, Modal, Field, Alert, PageLoader, Spinner } from '../components/ui';
-import { Send, Bell, Star, CheckCircle, AlertTriangle, Bot, ThumbsUp } from 'lucide-react';
+import { Send, Bell, Star, CheckCircle, AlertTriangle, Bot, ThumbsUp, Copy, ExternalLink, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { safeFormatDistanceToNow } from '../utils/date';
+import { formatDistanceToNow } from 'date-fns';
+
+// Extraction states that mean "AI is still working" — keep polling while any quote is in one of these.
+const IN_PROGRESS_STATUSES = ['pending', 'processing'];
+
+const copyToClipboard = async (text) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success('Link copied to clipboard');
+  } catch {
+    toast.error('Could not copy — copy it manually');
+  }
+};
 
 // ── RFQ LIST ──────────────────────────────────────────────────────────────
 export function RfqsPage() {
@@ -38,7 +50,17 @@ export function RfqDetailPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  const { data: rfq, isLoading } = useQuery({ queryKey: ['rfq', id], queryFn: () => rfqApi.getOne(id).then((r) => r.data.data) });
+  // Poll while any vendor's quote is still being extracted by AI, so the status
+  // updates on screen without the user needing to refresh the page.
+  const { data: rfq, isLoading } = useQuery({
+    queryKey: ['rfq', id],
+    queryFn: () => rfqApi.getOne(id).then((r) => r.data.data),
+    refetchInterval: (query) => {
+      const rv = query.state.data?.rfqVendors || [];
+      const anyExtracting = rv.some((v) => (v.Quotes || []).some((q) => IN_PROGRESS_STATUSES.includes(q.extraction_status)));
+      return anyExtracting ? 4000 : false;
+    },
+  });
 
   const sendMutation = useMutation({
     mutationFn: () => rfqApi.send(id),
@@ -56,6 +78,9 @@ export function RfqDetailPage() {
 
   const responded = rfq.rfqVendors?.filter((rv) => rv.status === 'responded').length || 0;
   const total = rfq.rfqVendors?.length || 0;
+  const anyResponded = responded > 0;
+
+  const vendorLink = (rv) => `${window.location.origin}/vendor/quote/${rv.access_token}`;
 
   return (
     <div className="space-y-4">
@@ -76,7 +101,7 @@ export function RfqDetailPage() {
             {rfq.status === 'sent' && (
               <>
                 <button className="btn-secondary flex items-center gap-2" onClick={() => remindMutation.mutate()} disabled={remindMutation.isPending}><Bell className="w-4 h-4" /> Remind</button>
-                <Link to={`/rfqs/${id}/comparison`} className="btn-primary flex items-center gap-2"><Star className="w-4 h-4" /> Compare Quotes</Link>
+                <Link to={`/rfqs/${id}/comparison`} className={`btn-primary flex items-center gap-2 ${!anyResponded ? 'opacity-50 pointer-events-none' : ''}`}><Star className="w-4 h-4" /> Compare Quotes</Link>
               </>
             )}
           </div>
@@ -89,18 +114,32 @@ export function RfqDetailPage() {
 
         <h2 className="text-sm font-semibold text-gray-500 uppercase mb-3">Vendor Responses</h2>
         <div className="space-y-2">
-          {rfq.rfqVendors?.map((rv) => (
-            <div key={rv.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-lg bg-gray-50">
-              <div>
-                <p className="text-sm font-medium">{rv.Vendor?.name}</p>
-                <p className="text-xs text-gray-400">{rv.Vendor?.email}</p>
+          {rfq.rfqVendors?.map((rv) => {
+            const extracting = (rv.Quotes || []).some((q) => IN_PROGRESS_STATUSES.includes(q.extraction_status));
+            return (
+              <div key={rv.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-lg bg-gray-50 flex-wrap gap-2">
+                <div>
+                  <p className="text-sm font-medium">{rv.Vendor?.name}</p>
+                  <p className="text-xs text-gray-400">{rv.Vendor?.email}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {extracting && <span className="flex items-center gap-1 text-xs text-brand-600"><Loader2 className="w-3.5 h-3.5 animate-spin" /> AI extracting…</span>}
+                  <StatusBadge status={rv.status} />
+                  {rv.access_token && (
+                    <>
+                      <button type="button" className="text-xs text-gray-500 hover:text-brand-600 flex items-center gap-1" title="Copy vendor quote link" onClick={() => copyToClipboard(vendorLink(rv))}>
+                        <Copy className="w-3.5 h-3.5" /> Copy Link
+                      </button>
+                      <a href={vendorLink(rv)} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:text-brand-600 flex items-center gap-1" title="Open vendor quote link">
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </>
+                  )}
+                  {rv.Quotes?.length > 0 && <Link to={`/quotes/${rv.Quotes[0].id}`} className="text-xs text-brand-600 hover:underline">View Quote</Link>}
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <StatusBadge status={rv.status} />
-                {rv.Quotes?.length > 0 && <Link to={`/quotes/${rv.Quotes[0].id}`} className="text-xs text-brand-600 hover:underline">View Quote</Link>}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {rfq.PurchaseRequest?.items?.length > 0 && (
@@ -124,34 +163,59 @@ export function RfqDetailPage() {
 // ── QUOTE INBOX ─────────────────────────────────────────────────────────────
 export function QuoteInboxPage() {
   const navigate = useNavigate();
-  const { data, isLoading } = useQuery({ queryKey: ['quotes-inbox'], queryFn: () => rfqApi.list({ per_page: 100 }).then((r) => r.data) });
+  const { data, isLoading } = useQuery({
+    queryKey: ['quotes-inbox'],
+    queryFn: () => rfqApi.list({ per_page: 100 }).then((r) => r.data),
+    // Keep polling while at least one quote anywhere in the inbox is still extracting.
+    refetchInterval: (query) => {
+      const rfqs = query.state.data?.data || [];
+      const anyExtracting = rfqs.some((rfq) => (rfq.rfqVendors || []).some((rv) => (rv.Quotes || []).some((q) => IN_PROGRESS_STATUSES.includes(q.extraction_status))));
+      return anyExtracting ? 4000 : false;
+    },
+  });
 
-  // Flatten all quotes across RFQs
+  // Flatten all quotes across RFQs, carrying the parent RFQ id/status so we can
+  // deep-link straight into the comparison page for that RFQ.
   const allQuotes = (data?.data || []).flatMap((rfq) =>
-    (rfq.rfqVendors || []).flatMap((rv) => (rv.Quotes || []).map((q) => ({ ...q, rfq_number: rfq.rfq_number, vendor_name: rv.Vendor?.name })))
+    (rfq.rfqVendors || []).flatMap((rv) => (rv.Quotes || []).map((q) => ({
+      ...q,
+      rfq_id: rfq.id,
+      rfq_number: rfq.rfq_number,
+      rfq_status: rfq.status,
+      vendor_name: rv.Vendor?.name,
+    })))
   );
 
   return (
     <div className="space-y-4">
       <h1>Quote Inbox</h1>
-      <Table headers={['RFQ', 'Vendor', 'Source', 'Extraction', 'Total', 'Received']} loading={isLoading}
+      <Table headers={['RFQ', 'Vendor', 'Source', 'Extraction', 'Total', 'Received', '']} loading={isLoading}
         empty={<EmptyState title="No quotes yet" description="Quotes from vendors will appear here after RFQs are sent" />}>
-        {allQuotes.map((q) => (
-          <tr key={q.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/quotes/${q.id}`)}>
-            <td className="table-td text-xs font-mono">{q.rfq_number}</td>
-            <td className="table-td font-medium">{q.vendor_name}</td>
-            <td className="table-td"><span className="badge-gray">{q.source_type}</span></td>
-            <td className="table-td">
-              <div className="flex items-center gap-1.5">
-                {q.extraction_status === 'needs_review' && <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />}
-                {q.extraction_status === 'done' && <CheckCircle className="w-3.5 h-3.5 text-green-500" />}
-                <StatusBadge status={q.extraction_status} />
-              </div>
-            </td>
-            <td className="table-td font-semibold">{q.total_amount ? `₹${Number(q.total_amount).toLocaleString('en-IN')}` : '—'}</td>
-            <td className="table-td text-xs text-gray-500">{safeFormatDistanceToNow(q.created_at, { addSuffix: true })}</td>
-          </tr>
-        ))}
+        {allQuotes.map((q) => {
+          const extracting = IN_PROGRESS_STATUSES.includes(q.extraction_status);
+          return (
+            <tr key={q.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/quotes/${q.id}`)}>
+              <td className="table-td text-xs font-mono"><Link to={`/rfqs/${q.rfq_id}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{q.rfq_number}</Link></td>
+              <td className="table-td font-medium">{q.vendor_name}</td>
+              <td className="table-td"><span className="badge-gray">{q.source_type}</span></td>
+              <td className="table-td">
+                <div className="flex items-center gap-1.5">
+                  {extracting && <Loader2 className="w-3.5 h-3.5 text-brand-500 animate-spin" />}
+                  {q.extraction_status === 'needs_review' && <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />}
+                  {q.extraction_status === 'done' && <CheckCircle className="w-3.5 h-3.5 text-green-500" />}
+                  <StatusBadge status={q.extraction_status} />
+                </div>
+              </td>
+              <td className="table-td font-semibold">{q.total_amount ? `₹${Number(q.total_amount).toLocaleString('en-IN')}` : '—'}</td>
+              <td className="table-td text-xs text-gray-500">{formatDistanceToNow(new Date(q.created_at), { addSuffix: true })}</td>
+              <td className="table-td text-right">
+                <Link to={`/rfqs/${q.rfq_id}/comparison`} className="text-xs text-brand-600 hover:underline flex items-center gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
+                  <Star className="w-3.5 h-3.5" /> Compare
+                </Link>
+              </td>
+            </tr>
+          );
+        })}
       </Table>
     </div>
   );
@@ -162,7 +226,13 @@ export function QuoteDetailPage() {
   const { id } = useParams();
   const qc = useQueryClient();
 
-  const { data: quote, isLoading } = useQuery({ queryKey: ['quote', id], queryFn: () => quotesApi.getOne(id).then((r) => r.data.data) });
+  // Auto-refresh while this quote's AI extraction is still running so the
+  // extracted line items appear the moment the background job finishes.
+  const { data: quote, isLoading } = useQuery({
+    queryKey: ['quote', id],
+    queryFn: () => quotesApi.getOne(id).then((r) => r.data.data),
+    refetchInterval: (query) => (IN_PROGRESS_STATUSES.includes(query.state.data?.extraction_status) ? 3000 : false),
+  });
 
   const reviewMutation = useMutation({
     mutationFn: () => quotesApi.reviewComplete(id),
@@ -178,6 +248,8 @@ export function QuoteDetailPage() {
   if (!quote) return <div className="card text-gray-500">Quote not found</div>;
 
   const needsReview = quote.extraction_status === 'needs_review';
+  const extracting = IN_PROGRESS_STATUSES.includes(quote.extraction_status);
+  const failed = quote.extraction_status === 'failed';
   const lowConfidence = quote.AiExtractions?.[0]?.confidence_overall < 0.75;
 
   return (
@@ -187,6 +259,12 @@ export function QuoteDetailPage() {
         <span>/</span><span className="text-gray-900 font-medium">{quote.Vendor?.name}</span>
       </div>
 
+      {extracting && (
+        <Alert type="info" message="AI is still extracting this quote — this page will refresh automatically when it's done." />
+      )}
+      {failed && (
+        <Alert type="error" message="AI extraction failed for this quote. Try Re-extract, or enter values manually below." />
+      )}
       {needsReview && (
         <Alert type="warning" message="AI confidence is low on some fields. Please review and correct extracted values before marking complete." />
       )}
@@ -202,6 +280,7 @@ export function QuoteDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {extracting && <Spinner size="sm" />}
             <StatusBadge status={quote.extraction_status} />
             {quote.ai_confidence && <span className="badge-gray">AI Confidence: {(quote.ai_confidence * 100).toFixed(0)}%</span>}
             {quote.source_file_url && <a href={quote.source_file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-600 hover:underline">View Source File</a>}
@@ -225,13 +304,16 @@ export function QuoteDetailPage() {
                 </td>
               </tr>
             ))}
+            {(!quote.items || quote.items.length === 0) && (
+              <tr><td colSpan={6} className="table-td text-center text-gray-400 py-6">{extracting ? 'Waiting for AI extraction…' : 'No line items yet'}</td></tr>
+            )}
           </tbody>
           <tfoot className="bg-gray-50"><tr><td colSpan={3} className="table-td text-right font-semibold">Total</td><td className="table-td font-bold text-brand-700">₹{Number(quote.total_amount || 0).toLocaleString('en-IN')}</td><td colSpan={2} /></tr></tfoot>
         </table>
 
         <div className="flex gap-3 justify-end">
-          <button className="btn-secondary" onClick={() => reprocessMutation.mutate()} disabled={reprocessMutation.isPending}>Re-extract</button>
-          {quote.extraction_status !== 'done' && <button className="btn-primary flex items-center gap-2" onClick={() => reviewMutation.mutate()} disabled={reviewMutation.isPending}><CheckCircle className="w-4 h-4" /> Mark Reviewed & Complete</button>}
+          <button className="btn-secondary" onClick={() => reprocessMutation.mutate()} disabled={reprocessMutation.isPending || extracting}>Re-extract</button>
+          {quote.extraction_status !== 'done' && <button className="btn-primary flex items-center gap-2" onClick={() => reviewMutation.mutate()} disabled={reviewMutation.isPending || extracting}><CheckCircle className="w-4 h-4" /> Mark Reviewed & Complete</button>}
         </div>
       </div>
     </div>
