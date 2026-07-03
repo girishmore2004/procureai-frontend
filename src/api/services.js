@@ -65,6 +65,7 @@ export const rfqApi = {
   create: (data) => api.post('/rfqs', data),
   getOne: (id) => api.get(`/rfqs/${id}`),
   send: (id) => api.post(`/rfqs/${id}/send`),
+  addVendors: (id, vendor_ids) => api.post(`/rfqs/${id}/vendors`, { vendor_ids }),
   remind: (id) => api.post(`/rfqs/${id}/remind`),
   getQuotes: (id) => api.get(`/rfqs/${id}/quotes`),
   getComparison: (id) => api.get(`/rfqs/${id}/comparison`),
