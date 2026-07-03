@@ -20,7 +20,7 @@ export function InvoicesPage() {
 
   const uploadMutation = useMutation({
     mutationFn: () => invoicesApi.upload(file, uploadForm),
-    onSuccess: (res) => { toast.success('Invoice uploaded — extracting data…'); qc.invalidateQueries(['invoices']); setUploadOpen(false); navigate(`/invoices/${res.data.data.id}`); },
+    onSuccess: (res) => { toast.success('Invoice uploaded and processed'); qc.invalidateQueries(['invoices']); setUploadOpen(false); navigate(`/invoices/${res.data.data.id}`); },
     onError: (e) => toast.error(e.response?.data?.error?.message || 'Upload failed'),
   });
 
