@@ -1,14 +1,15 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { analyticsApi, prApi, approvalsApi } from '../api/services';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { StatCard, StatusBadge, PageLoader, EmptyState } from '../components/ui';
 import { ClipboardList, AlertTriangle, Clock, FileText, Plus, TrendingUp, Bell, CheckCircle } from 'lucide-react';
-import { safeFormatDistanceToNow } from '../utils/date';
+import { formatDistanceToNow } from 'date-fns';
 
 export default function DashboardPage() {
   const { user, can } = useAuth();
+  const navigate = useNavigate();
 
   const { data: kpis, isLoading: kpiLoading } = useQuery({
     queryKey: ['dashboard-kpis'],
@@ -35,9 +36,12 @@ export default function DashboardPage() {
           <p className="text-sm text-gray-500 mt-0.5">Here's what's happening in procurement today</p>
         </div>
         {can('pr.create') && (
-          <Link to="/purchase-requests" className="btn-primary flex items-center gap-2">
+          <button
+            className="btn-primary flex items-center gap-2"
+            onClick={() => navigate('/purchase-requests', { state: { openCreate: true } })}
+          >
             <Plus className="w-4 h-4" /> New Request
-          </Link>
+          </button>
         )}
       </div>
 
@@ -63,7 +67,7 @@ export default function DashboardPage() {
                 <Link key={pr.id} to={`/purchase-requests/${pr.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition border border-gray-100">
                   <div>
                     <p className="text-sm font-medium text-gray-800">{pr.pr_number}</p>
-                    <p className="text-xs text-gray-500">{pr.department} · {safeFormatDistanceToNow(pr.created_at, { addSuffix: true })}</p>
+                    <p className="text-xs text-gray-500">{pr.department} · {formatDistanceToNow(new Date(pr.created_at), { addSuffix: true })}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-semibold text-gray-700">₹{Number(pr.total_estimated_amount).toLocaleString('en-IN')}</span>
@@ -72,7 +76,7 @@ export default function DashboardPage() {
                 </Link>
               ))}
             </div>
-          ) : <EmptyState title="No purchase requests yet" description="Create your first purchase request to get started" action={can('pr.create') && <Link to="/purchase-requests" className="btn-primary text-sm">Create Request</Link>} />}
+          ) : <EmptyState title="No purchase requests yet" description="Create your first purchase request to get started" action={can('pr.create') && <button className="btn-primary text-sm" onClick={() => navigate('/purchase-requests', { state: { openCreate: true } })}>Create Request</button>} />}
         </div>
 
         {/* Pending Approvals */}
@@ -87,7 +91,7 @@ export default function DashboardPage() {
                 <div key={ap.id} className="flex items-center justify-between p-3 rounded-lg border border-amber-100 bg-amber-50">
                   <div>
                     <p className="text-sm font-medium text-gray-800 capitalize">{ap.approvable_type?.replace(/_/g, ' ')}</p>
-                    <p className="text-xs text-gray-500">Level {ap.level} · {safeFormatDistanceToNow(ap.created_at, { addSuffix: true })}</p>
+                    <p className="text-xs text-gray-500">Level {ap.level} · {formatDistanceToNow(new Date(ap.created_at), { addSuffix: true })}</p>
                   </div>
                   <Link to="/approvals" className="text-xs text-brand-600 font-medium hover:underline">Review →</Link>
                 </div>
