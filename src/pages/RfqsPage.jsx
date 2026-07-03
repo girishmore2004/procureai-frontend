@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { rfqApi, quotesApi } from '../api/services';
+import { rfqApi, quotesApi, vendorsApi } from '../api/services';
 import { Table, EmptyState, StatusBadge, Modal, Field, Alert, PageLoader, Spinner } from '../components/ui';
-import { Send, Bell, Star, CheckCircle, AlertTriangle, Bot, ThumbsUp, Copy, ExternalLink, Loader2 } from 'lucide-react';
+import { Send, Bell, Star, CheckCircle, AlertTriangle, Bot, ThumbsUp, Copy, ExternalLink, Loader2, UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { safeFormatDistanceToNow, safeToLocaleDateString, safeToLocaleString } from '../utils/date';
 
@@ -73,6 +73,25 @@ export function RfqDetailPage() {
     onSuccess: (res) => toast.success(`Reminder sent to ${res.data.data.reminded} vendors`),
   });
 
+  // Vendors not yet on this RFQ, offered as candidates when adding a vendor later
+  const { data: vendorsData } = useQuery({ queryKey: ['vendors'], queryFn: () => vendorsApi.list().then((r) => r.data) });
+  const allVendors = vendorsData?.data || [];
+  const [addVendorOpen, setAddVendorOpen] = useState(false);
+  const [newVendorIds, setNewVendorIds] = useState([]);
+  const existingVendorIds = new Set((rfq?.rfqVendors || []).map((rv) => rv.vendor_id));
+  const availableVendors = allVendors.filter((v) => !existingVendorIds.has(v.id));
+
+  const addVendorMutation = useMutation({
+    mutationFn: () => rfqApi.addVendors(id, newVendorIds),
+    onSuccess: (res) => {
+      toast.success(`${res.data.data.added} vendor(s) added${rfq.status === 'sent' ? ' and emailed' : ''}`);
+      setAddVendorOpen(false);
+      setNewVendorIds([]);
+      qc.invalidateQueries(['rfq', id]);
+    },
+    onError: (e) => toast.error(e.response?.data?.error?.message || 'Failed to add vendor'),
+  });
+
   if (isLoading) return <PageLoader />;
   if (!rfq) return <div className="card text-gray-500">RFQ not found</div>;
 
@@ -97,6 +116,7 @@ export function RfqDetailPage() {
           </div>
           <div className="flex gap-2">
             <StatusBadge status={rfq.status} />
+            <button className="btn-secondary flex items-center gap-2" onClick={() => setAddVendorOpen(true)}><UserPlus className="w-4 h-4" /> Add Vendor</button>
             {rfq.status === 'draft' && <button className="btn-primary flex items-center gap-2" onClick={() => sendMutation.mutate()} disabled={sendMutation.isPending}><Send className="w-4 h-4" />{sendMutation.isPending ? 'Sending…' : 'Send to Vendors'}</button>}
             {rfq.status === 'sent' && (
               <>
@@ -156,6 +176,32 @@ export function RfqDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Add Vendor Modal */}
+      <Modal open={addVendorOpen} onClose={() => { setAddVendorOpen(false); setNewVendorIds([]); }} title="Add Vendor to RFQ" size="lg">
+        <div className="space-y-4">
+          {rfq.status === 'sent' && (
+            <Alert type="info" message="This RFQ was already sent — any vendor you add here will be emailed immediately, without affecting vendors already on the RFQ." />
+          )}
+          <Field label="Select Vendor(s)" required>
+            <div className="border border-gray-200 rounded-lg p-3 max-h-48 overflow-y-auto space-y-1">
+              {availableVendors.length === 0 && <p className="text-sm text-gray-400 px-2 py-1">All vendors are already on this RFQ.</p>}
+              {availableVendors.map((v) => (
+                <label key={v.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 px-2 py-1 rounded">
+                  <input type="checkbox" checked={newVendorIds.includes(v.id)} onChange={(e) => setNewVendorIds(e.target.checked ? [...newVendorIds, v.id] : newVendorIds.filter((x) => x !== v.id))} />
+                  {v.name} <span className="text-gray-400 text-xs">({v.email})</span>
+                </label>
+              ))}
+            </div>
+          </Field>
+        </div>
+        <div className="flex justify-end gap-3 mt-4">
+          <button className="btn-secondary" onClick={() => { setAddVendorOpen(false); setNewVendorIds([]); }}>Cancel</button>
+          <button className="btn-primary" disabled={!newVendorIds.length || addVendorMutation.isPending} onClick={() => addVendorMutation.mutate()}>
+            {addVendorMutation.isPending ? 'Adding…' : rfq.status === 'sent' ? 'Add & Send' : 'Add Vendor'}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }
