@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { prApi, itemsApi, rfqApi, vendorsApi } from '../api/services';
 import { Table, EmptyState, StatusBadge, Modal, Field, Pagination, Alert } from '../components/ui';
 import { Plus, Trash2, Send, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { safeFormatDistanceToNow } from '../utils/date';
+import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../context/AuthContext';
 
 // ── LIST PAGE ──────────────────────────────────────────────────────────────
@@ -15,6 +15,18 @@ export function PurchaseRequestsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Feature: Dashboard's "New Request" quick action deep-links here with
+  // navigation state so the create form opens immediately instead of just
+  // landing on the list. Clear the state after honoring it so a browser
+  // back/forward doesn't reopen the modal unexpectedly.
+  useEffect(() => {
+    if (location.state?.openCreate) {
+      setCreateOpen(true);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state]); // eslint-disable-line
 
   const { data, isLoading } = useQuery({
     queryKey: ['prs', page],
@@ -54,7 +66,7 @@ export function PurchaseRequestsPage() {
             <td className="table-td">{pr.department || '—'}</td>
             <td className="table-td"><span className={`badge-${pr.priority === 'urgent' ? 'red' : pr.priority === 'high' ? 'amber' : 'gray'}`}>{pr.priority}</span></td>
             <td className="table-td font-semibold">₹{Number(pr.total_estimated_amount).toLocaleString('en-IN')}</td>
-            <td className="table-td text-xs text-gray-500">{safeFormatDistanceToNow(pr.created_at, { addSuffix: true })}</td>
+            <td className="table-td text-xs text-gray-500">{formatDistanceToNow(new Date(pr.created_at), { addSuffix: true })}</td>
             <td className="table-td"><StatusBadge status={pr.status} /></td>
           </tr>
         ))}
