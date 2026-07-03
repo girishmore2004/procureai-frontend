@@ -302,7 +302,14 @@ export function QuoteDetailPage() {
 
   const reprocessMutation = useMutation({
     mutationFn: () => quotesApi.reprocess(id),
-    onSuccess: () => { toast.success('Reprocessing queued'); qc.invalidateQueries(['quote', id]); },
+    onSuccess: (res) => {
+      const { extraction_status, extraction_note } = res.data.data || {};
+      if (extraction_status === 'done') toast.success('Re-extraction complete');
+      else if (extraction_note) toast.error(extraction_note);
+      else toast.success('Re-extraction complete — please review');
+      qc.invalidateQueries(['quote', id]);
+    },
+    onError: (e) => toast.error(e.response?.data?.error?.message || 'Re-extraction failed'),
   });
 
   if (isLoading) return <PageLoader />;
@@ -376,7 +383,7 @@ export function QuoteDetailPage() {
         </table>
 
         <div className="flex gap-3 justify-end">
-          <button className="btn-secondary" onClick={() => reprocessMutation.mutate()} disabled={reprocessMutation.isPending || extracting}>Re-extract</button>
+          <button className="btn-secondary" onClick={() => reprocessMutation.mutate()} disabled={reprocessMutation.isPending || extracting}>{reprocessMutation.isPending ? 'Re-extracting…' : 'Re-extract'}</button>
           {quote.extraction_status !== 'done' && <button className="btn-primary flex items-center gap-2" onClick={() => reviewMutation.mutate()} disabled={reviewMutation.isPending || extracting}><CheckCircle className="w-4 h-4" /> Mark Reviewed & Complete</button>}
         </div>
       </div>
