@@ -5,7 +5,7 @@ import { grnApi, poApi } from '../api/services';
 import { Table, EmptyState, StatusBadge, Modal, Field, PageLoader, Pagination } from '../components/ui';
 import { Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { formatDistanceToNow } from 'date-fns';
+import { safeFormatDistanceToNow } from '../utils/date';
 
 export function GoodsReceiptsPage() {
   const qc = useQueryClient();
@@ -94,7 +94,7 @@ export function GoodsReceiptsPage() {
                 <tr className="hover:bg-gray-50 cursor-pointer" onClick={() => setExpanded(isOpen ? null : grn.id)}>
                   <td className="table-td font-medium">{grn.PurchaseOrder?.po_number || '—'}</td>
                   <td className="table-td">{grn.PurchaseOrder?.Vendor?.name || '—'}</td>
-                  <td className="table-td text-xs text-gray-500">{grn.received_date ? formatDistanceToNow(new Date(grn.received_date), { addSuffix: true }) : '—'}</td>
+                  <td className="table-td text-xs text-gray-500">{safeFormatDistanceToNow(grn.received_date)}</td>
                   <td className="table-td"><StatusBadge status={grn.status} /></td>
                   <td className="table-td text-xs text-gray-500 max-w-xs truncate">{grn.notes || '—'}</td>
                   <td className="table-td text-right">{isOpen ? <ChevronUp className="w-4 h-4 text-gray-400 inline" /> : <ChevronDown className="w-4 h-4 text-gray-400 inline" />}</td>
