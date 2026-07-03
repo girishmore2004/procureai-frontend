@@ -52,9 +52,10 @@ export function RfqDetailPage() {
 
   // Poll while any vendor's quote is still being extracted by AI, so the status
   // updates on screen without the user needing to refresh the page.
-  const { data: rfq, isLoading } = useQuery({
+  const { data: rfq, isLoading, error } = useQuery({
     queryKey: ['rfq', id],
     queryFn: () => rfqApi.getOne(id).then((r) => r.data.data),
+    retry: false,
     refetchInterval: (query) => {
       const rv = query.state.data?.rfqVendors || [];
       const anyExtracting = rv.some((v) => (v.Quotes || []).some((q) => IN_PROGRESS_STATUSES.includes(q.extraction_status)));
@@ -93,6 +94,20 @@ export function RfqDetailPage() {
   });
 
   if (isLoading) return <PageLoader />;
+  if (error) {
+    const status = error.response?.status;
+    const msg = error.response?.data?.error?.message;
+    return (
+      <div className="card text-center py-10">
+        <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto mb-3" />
+        <p className="font-medium text-gray-700">
+          {status === 403 ? "You don't have permission to view this RFQ" : status === 404 ? 'RFQ not found' : 'Could not load this RFQ'}
+        </p>
+        {msg && <p className="text-sm text-gray-400 mt-1">{msg}{status ? ` (${status})` : ''}</p>}
+        <Link to="/rfqs" className="btn-secondary mt-4 inline-block">← Back to RFQs</Link>
+      </div>
+    );
+  }
   if (!rfq) return <div className="card text-gray-500">RFQ not found</div>;
 
   const responded = rfq.rfqVendors?.filter((rv) => rv.status === 'responded').length || 0;
