@@ -1,11 +1,11 @@
 // ── NOTIFICATIONS ─────────────────────────────────────────────────────────
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { notificationsApi, auditApi, usersApi } from '../api/services';
+import { notificationsApi, auditApi, usersApi, settingsApi } from '../api/services';
 import { PageLoader, EmptyState, StatusBadge, Modal, Field } from '../components/ui';
-import { Bell, CheckCircle, Eye, Bot, Users, Shield } from 'lucide-react';
+import { Bell, Bot, Users, Plus, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { safeFormatDistanceToNow } from '../utils/date';
+import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../context/AuthContext';
 
 export function NotificationsPage() {
@@ -28,7 +28,7 @@ export function NotificationsPage() {
               <div className="flex-1">
                 <p className="text-sm font-medium text-gray-800">{n.payload?.title || n.type?.replace(/_/g, ' ')}</p>
                 <p className="text-xs text-gray-500 mt-0.5">{n.payload?.message || ''}</p>
-                <p className="text-xs text-gray-400 mt-1">{safeFormatDistanceToNow(n.created_at, { addSuffix: true })}</p>
+                <p className="text-xs text-gray-400 mt-1">{formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}</p>
               </div>
               {n.status !== 'read' && <button className="text-xs text-brand-600 hover:underline shrink-0" onClick={() => markRead.mutate(n.id)}>Mark read</button>}
             </div>
@@ -67,7 +67,7 @@ export function AuditLogsPage() {
                   <span className="badge-gray">{log.entity_type}</span>
                   {log.User && <span className="text-xs text-gray-500">by {log.User.name}</span>}
                 </div>
-                <p className="text-xs text-gray-400 mt-0.5">{safeFormatDistanceToNow(log.created_at, { addSuffix: true })} · {log.ip_address}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{formatDistanceToNow(new Date(log.created_at), { addSuffix: true })} · {log.ip_address}</p>
               </div>
               {log.after_value && (
                 <details className="text-xs text-gray-400 cursor-pointer">
@@ -85,9 +85,36 @@ export function AuditLogsPage() {
 
 // ── SETTINGS PAGE ────────────────────────────────────────────────────────────
 export function SettingsPage() {
-  const { data: company, isLoading } = useQuery({ queryKey: ['company'], queryFn: () => import('../api/services').then((m) => m.companyApi.getMe().then((r) => r.data.data)) });
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({ queryKey: ['settings'], queryFn: () => settingsApi.get().then((r) => r.data.data) });
   const [tab, setTab] = useState('company');
   const TABS = ['company', 'approvals', 'roles', 'billing'];
+
+  const company = data?.company;
+
+  // ── Company profile form ──────────────────────────────────────────────
+  const [companyForm, setCompanyForm] = useState(null);
+  useEffect(() => { if (company && !companyForm) setCompanyForm({ name: company.name || '', legal_name: company.legal_name || '', gstin: company.gstin || '', industry: company.industry || '', currency: company.currency || 'INR', timezone: company.timezone || 'Asia/Kolkata' }); }, [company]); // eslint-disable-line
+
+  const saveCompanyMutation = useMutation({
+    mutationFn: () => settingsApi.update({ company: companyForm }),
+    onSuccess: () => { toast.success('Company profile saved'); qc.invalidateQueries(['settings']); },
+    onError: (e) => toast.error(e.response?.data?.error?.message || 'Failed to save'),
+  });
+
+  // ── Approval thresholds ────────────────────────────────────────────────
+  const [thresholds, setThresholds] = useState(null);
+  useEffect(() => { if (company && !thresholds) setThresholds(company.approval_thresholds?.length ? company.approval_thresholds : [{ amount: '', levels: 1 }]); }, [company]); // eslint-disable-line
+
+  const saveThresholdsMutation = useMutation({
+    mutationFn: () => settingsApi.updateApprovalThresholds(thresholds.filter((t) => t.amount !== '').map((t) => ({ amount: Number(t.amount), levels: Number(t.levels) || 1 }))),
+    onSuccess: () => { toast.success('Approval thresholds saved'); qc.invalidateQueries(['settings']); },
+    onError: (e) => toast.error(e.response?.data?.error?.message || 'Failed to save'),
+  });
+
+  const addThreshold = () => setThresholds([...(thresholds || []), { amount: '', levels: 1 }]);
+  const removeThreshold = (i) => setThresholds(thresholds.filter((_, idx) => idx !== i));
+  const updateThreshold = (i, field, val) => setThresholds(thresholds.map((t, idx) => idx === i ? { ...t, [field]: val } : t));
 
   return (
     <div className="space-y-4">
@@ -95,33 +122,53 @@ export function SettingsPage() {
       <div className="flex gap-2 border-b border-gray-200">
         {TABS.map((t) => <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 text-sm font-medium capitalize border-b-2 transition ${tab === t ? 'border-brand-600 text-brand-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>{t}</button>)}
       </div>
+
       {tab === 'company' && (
         <div className="card space-y-4">
           <h2 className="text-base">Company Profile</h2>
-          {isLoading ? <PageLoader /> : company ? (
-            <div className="grid grid-cols-2 gap-4">
-              <div><label className="label">Company Name</label><input className="input" defaultValue={company.name} /></div>
-              <div><label className="label">Legal Name</label><input className="input" defaultValue={company.legal_name || ''} /></div>
-              <div><label className="label">GSTIN</label><input className="input" defaultValue={company.gstin || ''} /></div>
-              <div><label className="label">Industry</label><input className="input" defaultValue={company.industry || ''} /></div>
-              <div><label className="label">Currency</label><input className="input" defaultValue={company.currency || 'INR'} /></div>
-              <div><label className="label">Timezone</label><input className="input" defaultValue={company.timezone || 'Asia/Kolkata'} /></div>
-            </div>
-          ) : null}
-          <button className="btn-primary">Save Changes</button>
+          {isLoading || !companyForm ? <PageLoader /> : (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="label">Company Name</label><input className="input" value={companyForm.name} onChange={(e) => setCompanyForm({ ...companyForm, name: e.target.value })} /></div>
+                <div><label className="label">Legal Name</label><input className="input" value={companyForm.legal_name} onChange={(e) => setCompanyForm({ ...companyForm, legal_name: e.target.value })} /></div>
+                <div><label className="label">GSTIN</label><input className="input" value={companyForm.gstin} onChange={(e) => setCompanyForm({ ...companyForm, gstin: e.target.value })} /></div>
+                <div><label className="label">Industry</label><input className="input" value={companyForm.industry} onChange={(e) => setCompanyForm({ ...companyForm, industry: e.target.value })} /></div>
+                <div><label className="label">Currency</label><input className="input" value={companyForm.currency} onChange={(e) => setCompanyForm({ ...companyForm, currency: e.target.value })} /></div>
+                <div><label className="label">Timezone</label><input className="input" value={companyForm.timezone} onChange={(e) => setCompanyForm({ ...companyForm, timezone: e.target.value })} /></div>
+              </div>
+              <button className="btn-primary" disabled={saveCompanyMutation.isPending} onClick={() => saveCompanyMutation.mutate()}>{saveCompanyMutation.isPending ? 'Saving…' : 'Save Changes'}</button>
+            </>
+          )}
         </div>
       )}
+
       {tab === 'approvals' && (
         <div className="card">
           <h2 className="text-base mb-3">Approval Thresholds</h2>
-          <p className="text-sm text-gray-500 mb-4">Set the amount above which multi-level approvals are triggered.</p>
-          <div className="space-y-3">
-            <div className="flex gap-3 items-center"><input className="input w-40" type="number" placeholder="Amount (₹)" /><span className="text-sm text-gray-500">→ requires</span><input className="input w-20" type="number" placeholder="Levels" /><span className="text-sm text-gray-500">approval level(s)</span></div>
-          </div>
-          <button className="btn-primary mt-4">Save Thresholds</button>
+          <p className="text-sm text-gray-500 mb-4">Set the amount above which multi-level approvals are triggered. E.g. above ₹25,000 needs 1 approval level, above ₹1,00,000 needs 2.</p>
+          {isLoading || !thresholds ? <PageLoader /> : (
+            <>
+              <div className="space-y-3">
+                {thresholds.map((t, i) => (
+                  <div key={i} className="flex gap-3 items-center">
+                    <span className="text-sm text-gray-500">Above ₹</span>
+                    <input className="input w-40" type="number" min="0" placeholder="Amount (₹)" value={t.amount} onChange={(e) => updateThreshold(i, 'amount', e.target.value)} />
+                    <span className="text-sm text-gray-500">→ requires</span>
+                    <input className="input w-20" type="number" min="1" placeholder="Levels" value={t.levels} onChange={(e) => updateThreshold(i, 'levels', e.target.value)} />
+                    <span className="text-sm text-gray-500">approval level(s)</span>
+                    <button type="button" className="text-gray-400 hover:text-red-500 ml-auto" onClick={() => removeThreshold(i)} title="Remove"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                ))}
+              </div>
+              <button type="button" className="btn-secondary flex items-center gap-2 mt-3 text-sm" onClick={addThreshold}><Plus className="w-4 h-4" /> Add Threshold</button>
+              <div><button className="btn-primary mt-4" disabled={saveThresholdsMutation.isPending} onClick={() => saveThresholdsMutation.mutate()}>{saveThresholdsMutation.isPending ? 'Saving…' : 'Save Thresholds'}</button></div>
+            </>
+          )}
         </div>
       )}
+
       {tab === 'roles' && <div className="card"><h2 className="text-base mb-2">Roles & Permissions</h2><p className="text-sm text-gray-500">Manage user roles from the <a href="/users" className="text-brand-600 hover:underline">Users page</a>.</p></div>}
+
       {tab === 'billing' && (
         <div className="card">
           <h2 className="text-base mb-3">Billing & Plan</h2>
@@ -161,7 +208,7 @@ export function UsersPage() {
 
   const addMutation = useMutation({
     mutationFn: usersApi.create,
-    onSuccess: () => { toast.success('User invited'); qc.invalidateQueries(['users']); setAddOpen(false); },
+    onSuccess: () => { toast.success('User invited'); qc.invalidateQueries(['users']); setAddOpen(false); setForm({ name: '', email: '', role_id: '', department: '', phone: '' }); },
     onError: (e) => toast.error(e.response?.data?.error?.message || 'Failed'),
   });
 
