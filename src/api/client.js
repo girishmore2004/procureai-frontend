@@ -1,9 +1,11 @@
 import axios from 'axios';
 
+const API_BASE = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api/v1`
+  : '/api/v1';
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL
-     ? `${import.meta.env.VITE_API_URL}/api/v1`
-     : '/api/v1',
+  baseURL: API_BASE,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -17,7 +19,7 @@ api.interceptors.response.use(
       const refresh = localStorage.getItem('procureai_refresh');
       if (refresh) {
         try {
-          const { data } = await axios.post('/api/v1/auth/refresh', { refresh_token: refresh });
+          const { data } = await axios.post(`${API_BASE}/auth/refresh`, { refresh_token: refresh });
           const newToken = data.data.access_token;
           localStorage.setItem('procureai_token', newToken);
           api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
