@@ -314,6 +314,9 @@ export function QuoteDetailPage() {
       {needsReview && (
         <Alert type="warning" message="AI confidence is low on some fields. Please review and correct extracted values before marking complete." />
       )}
+      {quote.extraction_note && (
+        <Alert type="warning" message={quote.extraction_note} />
+      )}
 
       <div className="card">
         <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
