@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { analyticsApi } from '../api/services';
+import { analyticsApi, exportApi } from '../api/services';
 import { StatCard, PageLoader } from '../components/ui';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Legend } from 'recharts';
-import { TrendingUp, TrendingDown, Clock, CheckCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Clock, CheckCircle, Download, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
 export default function AnalyticsPage() {
   const [spendGroup, setSpendGroup] = useState('vendor');
+  const [exporting, setExporting] = useState(null); // 'spend' | 'pos' | 'vendors' | null
 
   const { data: spend, isLoading: spendLoading } = useQuery({ queryKey: ['spend', spendGroup], queryFn: () => analyticsApi.getSpend({ group_by: spendGroup }).then((r) => r.data.data) });
   const { data: cycle } = useQuery({ queryKey: ['cycle-times'], queryFn: () => analyticsApi.getCycleTimes().then((r) => r.data.data) });
@@ -22,9 +24,34 @@ export default function AnalyticsPage() {
     return acc;
   }, []).slice(0, 8);
 
+  const runExport = async (key, fn) => {
+    setExporting(key);
+    try {
+      await fn();
+      toast.success('Export downloaded');
+    } catch (e) {
+      toast.error(e.response?.data?.error?.message || 'Export failed');
+    } finally {
+      setExporting(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <h1>Analytics</h1>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h1>Analytics</h1>
+        <div className="flex gap-2">
+          <button className="btn-secondary flex items-center gap-2 text-sm" disabled={exporting === 'pos'} onClick={() => runExport('pos', exportApi.purchaseOrders)}>
+            {exporting === 'pos' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Export POs
+          </button>
+          <button className="btn-secondary flex items-center gap-2 text-sm" disabled={exporting === 'vendors'} onClick={() => runExport('vendors', exportApi.vendors)}>
+            {exporting === 'vendors' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Export Vendors
+          </button>
+          <button className="btn-primary flex items-center gap-2 text-sm" disabled={exporting === 'spend'} onClick={() => runExport('spend', exportApi.spendReport)}>
+            {exporting === 'spend' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Export to Excel
+          </button>
+        </div>
+      </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
