@@ -99,6 +99,7 @@ export const poApi = {
 
 // GRN
 export const grnApi = {
+  list: (params) => api.get('/goods-receipts', { params }),
   create: (data) => api.post('/goods-receipts', data),
   getOne: (id) => api.get(`/goods-receipts/${id}`),
   inspect: (id, data) => api.patch(`/goods-receipts/${id}/inspect`, data),
@@ -140,6 +141,37 @@ export const notificationsApi = {
 // AUDIT
 export const auditApi = {
   list: (params) => api.get('/audit-logs', { params }),
+};
+
+// SETTINGS (company profile + approval thresholds + misc key/value settings)
+export const settingsApi = {
+  get: () => api.get('/settings'),
+  update: (data) => api.patch('/settings', data),
+  updateApprovalThresholds: (thresholds) => api.patch('/settings/approval-thresholds', { thresholds }),
+};
+
+// EXPORTS (Excel downloads)
+const downloadBlob = async (promise, fallbackName) => {
+  const res = await promise;
+  const disposition = res.headers?.['content-disposition'] || '';
+  const match = disposition.match(/filename="?([^"]+)"?/);
+  const filename = match?.[1] || fallbackName;
+  const url = window.URL.createObjectURL(new Blob([res.data]));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+  return filename;
+};
+
+export const exportApi = {
+  comparison: (rfqId) => downloadBlob(api.get('/export/comparison', { params: { rfq_id: rfqId }, responseType: 'blob' }), 'Quote-Comparison.xlsx'),
+  purchaseOrders: () => downloadBlob(api.get('/export/purchase-orders', { responseType: 'blob' }), 'Purchase-Orders.xlsx'),
+  vendors: () => downloadBlob(api.get('/export/vendors', { responseType: 'blob' }), 'Vendors.xlsx'),
+  spendReport: () => downloadBlob(api.get('/export/spend-report', { responseType: 'blob' }), 'Spend-Report.xlsx'),
 };
 
 // PUBLIC (vendor quote submission)
