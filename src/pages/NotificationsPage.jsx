@@ -5,7 +5,7 @@ import { notificationsApi, auditApi, usersApi, settingsApi } from '../api/servic
 import { PageLoader, EmptyState, StatusBadge, Modal, Field } from '../components/ui';
 import { Bell, Bot, Users, Plus, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { formatDistanceToNow } from 'date-fns';
+import { safeFormatDistanceToNow } from '../utils/date';
 import { useAuth } from '../context/AuthContext';
 
 export function NotificationsPage() {
@@ -28,7 +28,7 @@ export function NotificationsPage() {
               <div className="flex-1">
                 <p className="text-sm font-medium text-gray-800">{n.payload?.title || n.type?.replace(/_/g, ' ')}</p>
                 <p className="text-xs text-gray-500 mt-0.5">{n.payload?.message || ''}</p>
-                <p className="text-xs text-gray-400 mt-1">{formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}</p>
+                <p className="text-xs text-gray-400 mt-1">{safeFormatDistanceToNow(n.created_at)}</p>
               </div>
               {n.status !== 'read' && <button className="text-xs text-brand-600 hover:underline shrink-0" onClick={() => markRead.mutate(n.id)}>Mark read</button>}
             </div>
@@ -67,7 +67,7 @@ export function AuditLogsPage() {
                   <span className="badge-gray">{log.entity_type}</span>
                   {log.User && <span className="text-xs text-gray-500">by {log.User.name}</span>}
                 </div>
-                <p className="text-xs text-gray-400 mt-0.5">{formatDistanceToNow(new Date(log.created_at), { addSuffix: true })} · {log.ip_address}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{safeFormatDistanceToNow(log.created_at)} · {log.ip_address}</p>
               </div>
               {log.after_value && (
                 <details className="text-xs text-gray-400 cursor-pointer">
