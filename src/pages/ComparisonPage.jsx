@@ -99,6 +99,9 @@ export default function ComparisonPage() {
       )}
 
       {!allDone && <Alert type="warning" message="Some quotes are still processing. Comparison may be incomplete." />}
+      {quotes.filter((q) => q.extraction_note).map((q) => (
+        <Alert key={q.quote_id} type="warning" message={`${q.vendor?.name}: ${q.extraction_note}`} />
+      ))}
 
       {/* Comparison Table */}
       <div className="card overflow-x-auto">
