@@ -5,7 +5,7 @@ import { rfqApi, quotesApi } from '../api/services';
 import { Table, EmptyState, StatusBadge, Modal, Field, Alert, PageLoader, Spinner } from '../components/ui';
 import { Send, Bell, Star, CheckCircle, AlertTriangle, Bot, ThumbsUp, Copy, ExternalLink, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { formatDistanceToNow } from 'date-fns';
+import { safeFormatDistanceToNow, safeToLocaleDateString, safeToLocaleString } from '../utils/date';
 
 // Extraction states that mean "AI is still working" — keep polling while any quote is in one of these.
 const IN_PROGRESS_STATUSES = ['pending', 'processing'];
@@ -35,7 +35,7 @@ export function RfqsPage() {
             <td className="table-td"><Link to={`/rfqs/${rfq.id}`} className="text-brand-600 hover:underline font-medium">{rfq.rfq_number}</Link></td>
             <td className="table-td text-xs">{rfq.purchase_request_id?.slice(-8)}</td>
             <td className="table-td">{rfq.rfqVendors?.length || 0} vendors</td>
-            <td className="table-td text-xs">{rfq.deadline ? new Date(rfq.deadline).toLocaleDateString('en-IN') : '—'}</td>
+            <td className="table-td text-xs">{safeToLocaleDateString(rfq.deadline)}</td>
             <td className="table-td"><StatusBadge status={rfq.status} /></td>
           </tr>
         ))}
@@ -93,7 +93,7 @@ export function RfqDetailPage() {
         <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
           <div>
             <h1 className="mb-1">{rfq.rfq_number}</h1>
-            <p className="text-sm text-gray-500">Deadline: {rfq.deadline ? new Date(rfq.deadline).toLocaleString('en-IN') : '—'} · {rfq.delivery_location}</p>
+            <p className="text-sm text-gray-500">Deadline: {safeToLocaleString(rfq.deadline)} · {rfq.delivery_location}</p>
           </div>
           <div className="flex gap-2">
             <StatusBadge status={rfq.status} />
@@ -207,7 +207,7 @@ export function QuoteInboxPage() {
                 </div>
               </td>
               <td className="table-td font-semibold">{q.total_amount ? `₹${Number(q.total_amount).toLocaleString('en-IN')}` : '—'}</td>
-              <td className="table-td text-xs text-gray-500">{formatDistanceToNow(new Date(q.created_at), { addSuffix: true })}</td>
+              <td className="table-td text-xs text-gray-500">{safeFormatDistanceToNow(q.created_at)}</td>
               <td className="table-td text-right">
                 <Link to={`/rfqs/${q.rfq_id}/comparison`} className="text-xs text-brand-600 hover:underline flex items-center gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
                   <Star className="w-3.5 h-3.5" /> Compare
