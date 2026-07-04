@@ -3,43 +3,164 @@ import { useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { publicApi } from '../api/services';
 import { Spinner, Field, Alert } from '../components/ui';
-import { ShoppingCart, Upload, CheckCircle, Plus, Trash2 } from 'lucide-react';
+import {
+  ShoppingCart, Upload, CheckCircle, Plus, Trash2,
+  RefreshCw, AlertTriangle, Edit3, FileText, PenLine,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
+
+// ── Step labels ────────────────────────────────────────────────────────────
+const STEPS = ['Upload / Enter', 'Review & Confirm', 'Submitted'];
 
 export default function VendorQuotePage() {
   const { token } = useParams();
-  const [file, setFile] = useState(null);
-  const [manualMode, setManualMode] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [form, setForm] = useState({ payment_terms: '', delivery_time_days: '', validity_date: '' });
-  const [items, setItems] = useState([{ item_name_raw: '', quantity: '', unit_price: '', total_price: '' }]);
 
+  // UI state
+  const [step, setStep] = useState(0);       // 0=upload, 1=review, 2=done
+  const [inputMode, setInputMode] = useState('upload'); // 'upload' | 'manual'
+  const [file, setFile] = useState(null);
+  const [validating, setValidating] = useState(false);
+  const [validateError, setValidateError] = useState('');
+
+  // Quote header fields (editable even when extracted from file)
+  const [header, setHeader] = useState({ payment_terms: '', delivery_time_days: '', validity_date: '' });
+
+  // Line items — pre-filled from extraction or entered manually
+  const [items, setItems] = useState([{ item_name_raw: '', quantity: '', unit_price: '', total_price: '', tax: '0', freight: '0' }]);
+  const [extractionConfidence, setExtractionConfidence] = useState(null);
+  const [extractionNote, setExtractionNote] = useState('');
+
+  // Load RFQ details
   const { data, isLoading, error } = useQuery({
     queryKey: ['public-rfq', token],
     queryFn: () => publicApi.getRfq(token).then((r) => r.data.data),
     retry: false,
   });
 
+  // Submit final confirmed quote
   const submitMutation = useMutation({
     mutationFn: () => {
-      const payload = { ...form };
-      if (manualMode) payload.items = JSON.stringify(items);
-      return publicApi.submitQuote(token, manualMode ? null : file, payload);
+      const payload = {
+        ...header,
+        items: JSON.stringify(items.filter((i) => i.item_name_raw).map((i) => ({
+          item_name_raw: i.item_name_raw,
+          quantity: parseFloat(i.quantity) || 0,
+          unit_price: parseFloat(i.unit_price) || 0,
+          total_price: parseFloat(i.total_price) || (parseFloat(i.quantity || 0) * parseFloat(i.unit_price || 0)),
+          tax: parseFloat(i.tax) || 0,
+          freight: parseFloat(i.freight) || 0,
+        }))),
+      };
+      // Always submit as manual/JSON — file was already validated; we submit confirmed items
+      return publicApi.submitQuote(token, null, payload);
     },
-    onSuccess: () => { setSubmitted(true); },
-    onError: (e) => toast.error(e.response?.data?.error?.message || 'Submission failed'),
+    onSuccess: () => setStep(2),
+    onError: (e) => toast.error(e.response?.data?.error?.message || 'Submission failed. Please try again.'),
   });
 
-  const updateItem = (i, f, v) => setItems(items.map((it, idx) => idx === i ? { ...it, [f]: v, total_price: f === 'quantity' || f === 'unit_price' ? String((Number(f === 'quantity' ? v : it.quantity) || 0) * (Number(f === 'unit_price' ? v : it.unit_price) || 0)) : it.total_price } : it));
+  // ── Handlers ────────────────────────────────────────────────────────────
 
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0] || null);
+    setValidateError('');
+    setExtractionNote('');
+    setExtractionConfidence(null);
+  };
+
+  const handleValidate = async () => {
+    if (!file) return;
+    setValidating(true);
+    setValidateError('');
+    try {
+      const res = await publicApi.validateQuote(token, file);
+      const result = res.data.data;
+
+      if (!result.success) {
+        // Extraction failed — show error and auto-switch to manual
+        setValidateError(result.error || 'Could not extract data from this file.');
+        setInputMode('manual');
+        setValidating(false);
+        return;
+      }
+
+      // Populate form from extraction
+      setHeader({
+        payment_terms: result.payment_terms || '',
+        delivery_time_days: result.delivery_time_days ? String(result.delivery_time_days) : '',
+        validity_date: result.validity_date || '',
+      });
+
+      if (result.items?.length) {
+        setItems(result.items.map((i) => ({
+          item_name_raw: i.item_name_raw || '',
+          quantity: i.quantity ? String(i.quantity) : '',
+          unit_price: i.unit_price ? String(i.unit_price) : '',
+          total_price: i.total_price ? String(i.total_price) : '',
+          tax: i.tax ? String(i.tax) : '0',
+          freight: i.freight ? String(i.freight) : '0',
+          confidence_score: i.confidence_score,
+        })));
+      } else {
+        // Extraction succeeded but no items found — prompt manual entry
+        setValidateError('AI could not identify any line items in this file. Please enter them manually below.');
+        setInputMode('manual');
+      }
+
+      setExtractionConfidence(result.confidence_overall);
+      if (result.mock) setExtractionNote('AI is not configured — values pre-filled from template. Please review and correct all fields.');
+      else if (result.truncated) setExtractionNote('AI response was cut off — some items may be missing. Please add any missing rows.');
+      else if (result.notes) setExtractionNote(result.notes);
+
+      // Move to review step
+      setStep(1);
+    } catch (err) {
+      setValidateError('Extraction service unavailable. Please enter your quote manually.');
+      setInputMode('manual');
+    } finally {
+      setValidating(false);
+    }
+  };
+
+  const handleGoManual = () => {
+    setInputMode('manual');
+    setValidateError('');
+    setFile(null);
+  };
+
+  const handleProceedManual = () => {
+    if (!items.some((i) => i.item_name_raw)) {
+      toast.error('Add at least one item before proceeding');
+      return;
+    }
+    setStep(1);
+  };
+
+  const updateItem = (idx, field, val) => {
+    setItems(items.map((it, i) => {
+      if (i !== idx) return it;
+      const updated = { ...it, [field]: val };
+      if (field === 'quantity' || field === 'unit_price') {
+        const q = parseFloat(field === 'quantity' ? val : it.quantity) || 0;
+        const p = parseFloat(field === 'unit_price' ? val : it.unit_price) || 0;
+        updated.total_price = String((q * p).toFixed(2));
+      }
+      return updated;
+    }));
+  };
+
+  const addRow = () => setItems([...items, { item_name_raw: '', quantity: '', unit_price: '', total_price: '', tax: '0', freight: '0' }]);
+  const removeRow = (idx) => { if (items.length > 1) setItems(items.filter((_, i) => i !== idx)); };
+
+  const totalAmount = items.reduce((s, i) => s + (parseFloat(i.total_price) || 0), 0);
+
+  // ── Guard states ─────────────────────────────────────────────────────────
   if (isLoading) return <div className="flex items-center justify-center h-screen"><Spinner size="lg" /></div>;
-  if (error) return <div className="flex items-center justify-center h-screen"><div className="card max-w-md text-center"><p className="text-red-600 font-medium">Invalid or expired quote link</p><p className="text-sm text-gray-500 mt-2">Contact your buyer for a new link.</p></div></div>;
-  if (submitted) return (
-    <div className="flex items-center justify-center h-screen bg-gray-50">
-      <div className="card max-w-md text-center">
-        <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-        <h2 className="text-xl font-bold mb-2">Quote Submitted!</h2>
-        <p className="text-gray-500">Your quote has been received. The buyer will review it and get back to you.</p>
+  if (error) return (
+    <div className="flex items-center justify-center h-screen bg-gray-50 px-4">
+      <div className="bg-white rounded-xl shadow p-8 max-w-md text-center">
+        <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-3" />
+        <p className="text-red-600 font-semibold text-lg mb-1">Invalid or expired link</p>
+        <p className="text-sm text-gray-500">This quote link is invalid or has already been used. Contact your buyer for a new link.</p>
       </div>
     </div>
   );
@@ -47,105 +168,350 @@ export default function VendorQuotePage() {
   const rfq = data?.rfq;
   const vendor = data?.vendor;
 
+  // ── Step 2: Success ───────────────────────────────────────────────────────
+  if (step === 2) return (
+    <div className="flex items-center justify-center h-screen bg-gray-50 px-4">
+      <div className="bg-white rounded-xl shadow p-10 max-w-md text-center">
+        <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+        <h2 className="text-2xl font-bold mb-2">Quote Submitted!</h2>
+        <p className="text-gray-500 mb-4">
+          Your quote for <strong>{rfq?.rfq_number}</strong> has been received by the buyer.
+          They will review it and contact you if selected.
+        </p>
+        <div className="bg-gray-50 rounded-lg p-4 text-sm text-left space-y-1">
+          <div className="flex justify-between"><span className="text-gray-500">Items submitted:</span><span className="font-medium">{items.filter((i) => i.item_name_raw).length}</span></div>
+          <div className="flex justify-between"><span className="text-gray-500">Total quoted:</span><span className="font-semibold text-brand-600">₹{totalAmount.toLocaleString('en-IN')}</span></div>
+          <div className="flex justify-between"><span className="text-gray-500">Delivery:</span><span className="font-medium">{header.delivery_time_days ? `${header.delivery_time_days} days` : '—'}</span></div>
+          <div className="flex justify-between"><span className="text-gray-500">Payment terms:</span><span className="font-medium">{header.payment_terms || '—'}</span></div>
+        </div>
+        <p className="text-xs text-gray-400 mt-4">Powered by ProcureAI</p>
+      </div>
+    </div>
+  );
+
+  // ── Page wrapper ─────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-2xl mx-auto">
+    <div className="min-h-screen bg-gray-50 py-6 px-4">
+      <div className="max-w-3xl mx-auto">
+
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center"><ShoppingCart className="w-5 h-5 text-white" /></div>
-          <div>
+          <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center shrink-0">
+            <ShoppingCart className="w-5 h-5 text-white" />
+          </div>
+          <div className="flex-1">
             <p className="font-bold text-gray-900">ProcureAI — Quote Request</p>
-            <p className="text-sm text-gray-500">For: {vendor?.name}</p>
+            <p className="text-sm text-gray-500">
+              {vendor?.name} · RFQ: {rfq?.rfq_number}
+            </p>
           </div>
-        </div>
-
-        <div className="card mb-4">
-          <h2 className="font-semibold mb-3">RFQ: {rfq?.rfq_number}</h2>
-          <div className="grid grid-cols-2 gap-3 text-sm mb-3">
-            <div><span className="text-gray-500">Quote Deadline:</span> <strong>{rfq?.deadline ? new Date(rfq.deadline).toLocaleDateString('en-IN') : '—'}</strong></div>
-            <div><span className="text-gray-500">Delivery Location:</span> <strong>{rfq?.delivery_location || '—'}</strong></div>
-          </div>
-          {rfq?.terms && <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-600"><strong>Terms:</strong> {rfq.terms}</div>}
-        </div>
-
-        {/* Items requested */}
-        {rfq?.PurchaseRequest?.items?.length > 0 && (
-          <div className="card mb-4">
-            <h2 className="font-semibold mb-3">Items Required</h2>
-            <table className="min-w-full divide-y divide-gray-100">
-              <thead className="bg-gray-50"><tr><th className="table-th">Item</th><th className="table-th">Qty</th><th className="table-th">Notes</th></tr></thead>
-              <tbody className="divide-y divide-gray-50">
-                {rfq.PurchaseRequest.items.map((it) => (
-                  <tr key={it.id}>
-                    <td className="table-td">{it.Item?.name || it.item_name_freetext}</td>
-                    <td className="table-td">{it.quantity}</td>
-                    <td className="table-td text-xs text-gray-500">{it.notes || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Quote Submission */}
-        <div className="card">
-          <h2 className="font-semibold mb-4">Submit Your Quote</h2>
-
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            <Field label="Payment Terms"><input className="input" placeholder="e.g. Net 30" value={form.payment_terms} onChange={(e) => setForm({ ...form, payment_terms: e.target.value })} /></Field>
-            <Field label="Delivery Days"><input className="input" type="number" placeholder="e.g. 7" value={form.delivery_time_days} onChange={(e) => setForm({ ...form, delivery_time_days: e.target.value })} /></Field>
-            <Field label="Valid Until"><input className="input" type="date" value={form.validity_date} onChange={(e) => setForm({ ...form, validity_date: e.target.value })} /></Field>
-          </div>
-
-          {/* Toggle between file upload and manual entry */}
-          <div className="flex gap-2 mb-4">
-            <button className={`text-sm px-3 py-1.5 rounded-lg font-medium transition ${!manualMode ? 'bg-brand-100 text-brand-700' : 'bg-gray-100 text-gray-600'}`} onClick={() => setManualMode(false)}>Upload Quote File</button>
-            <button className={`text-sm px-3 py-1.5 rounded-lg font-medium transition ${manualMode ? 'bg-brand-100 text-brand-700' : 'bg-gray-100 text-gray-600'}`} onClick={() => setManualMode(true)}>Enter Manually</button>
-          </div>
-
-          {!manualMode ? (
-            <div>
-              <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-8 cursor-pointer hover:border-brand-400 transition">
-                <Upload className="w-8 h-8 text-gray-400 mb-2" />
-                <span className="text-sm text-gray-500">{file ? file.name : 'Upload your quote PDF, Excel, or image'}</span>
-                <span className="text-xs text-gray-400 mt-1">Max 20MB · PDF, XLSX, JPG, PNG</span>
-                <input type="file" className="hidden" accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png" onChange={(e) => setFile(e.target.files[0])} />
-              </label>
-              <Alert type="info" message="AI will automatically extract item prices and details from your file." />
-            </div>
-          ) : (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="label mb-0">Quote Line Items</label>
-                <button className="text-xs text-brand-600 flex items-center gap-1" onClick={() => setItems([...items, { item_name_raw: '', quantity: '', unit_price: '', total_price: '' }])}><Plus className="w-3 h-3" /> Add row</button>
+          {/* Step indicator */}
+          <div className="hidden sm:flex items-center gap-2">
+            {STEPS.slice(0, 2).map((s, i) => (
+              <div key={s} className="flex items-center gap-1.5">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i < step ? 'bg-green-500 text-white' : i === step ? 'bg-brand-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                  {i < step ? '✓' : i + 1}
+                </div>
+                <span className={`text-xs ${i === step ? 'text-brand-600 font-medium' : 'text-gray-400'}`}>{s}</span>
+                {i < 1 && <div className="w-6 h-px bg-gray-300 mx-1" />}
               </div>
-              <table className="min-w-full border border-gray-200 rounded-lg overflow-hidden">
-                <thead className="bg-gray-50"><tr><th className="table-th">Item Name</th><th className="table-th">Qty</th><th className="table-th">Unit Price (₹)</th><th className="table-th">Total</th><th /></tr></thead>
-                <tbody className="divide-y divide-gray-100">
-                  {items.map((it, i) => (
-                    <tr key={i}>
-                      <td className="px-2 py-2"><input className="input text-sm" value={it.item_name_raw} onChange={(e) => updateItem(i, 'item_name_raw', e.target.value)} placeholder="Item name" /></td>
-                      <td className="px-2 py-2"><input className="input w-16 text-sm" type="number" value={it.quantity} onChange={(e) => updateItem(i, 'quantity', e.target.value)} /></td>
-                      <td className="px-2 py-2"><input className="input w-24 text-sm" type="number" value={it.unit_price} onChange={(e) => updateItem(i, 'unit_price', e.target.value)} /></td>
-                      <td className="px-2 py-2 text-sm font-medium">₹{Number(it.total_price || 0).toLocaleString('en-IN')}</td>
-                      <td className="px-2 py-2"><button onClick={() => setItems(items.filter((_, idx) => idx !== i))} className="text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button></td>
+            ))}
+          </div>
+        </div>
+
+        {/* RFQ Summary */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+          <div className="flex flex-wrap gap-4 text-sm">
+            <div><span className="text-gray-400">Deadline:</span> <strong>{rfq?.deadline ? new Date(rfq.deadline).toLocaleDateString('en-IN') : '—'}</strong></div>
+            <div><span className="text-gray-400">Deliver to:</span> <strong>{rfq?.delivery_location || '—'}</strong></div>
+            {rfq?.terms && <div><span className="text-gray-400">Terms:</span> {rfq.terms}</div>}
+          </div>
+        </div>
+
+        {/* Items Requested */}
+        {rfq?.PurchaseRequest?.items?.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+            <h2 className="font-semibold text-sm text-gray-700 mb-3 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-brand-600" /> Items Required
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead><tr className="border-b border-gray-100"><th className="text-left py-1.5 pr-4 text-xs text-gray-500 font-medium">Item</th><th className="text-left py-1.5 px-2 text-xs text-gray-500 font-medium">Qty</th><th className="text-left py-1.5 px-2 text-xs text-gray-500 font-medium">Unit</th><th className="text-left py-1.5 px-2 text-xs text-gray-500 font-medium">Notes</th></tr></thead>
+                <tbody>
+                  {rfq.PurchaseRequest.items.map((it) => (
+                    <tr key={it.id} className="border-b border-gray-50 last:border-0">
+                      <td className="py-1.5 pr-4 font-medium text-gray-800">{it.Item?.name || it.item_name_freetext}</td>
+                      <td className="py-1.5 px-2 text-gray-600">{it.quantity}</td>
+                      <td className="py-1.5 px-2 text-gray-500">{it.Item?.unit || '—'}</td>
+                      <td className="py-1.5 px-2 text-gray-400 text-xs">{it.notes || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          )}
-
-          <div className="flex justify-end mt-4">
-            <button className="btn-primary px-8"
-              disabled={(!file && !manualMode) || (manualMode && !items.some((i) => i.item_name_raw)) || submitMutation.isPending}
-              onClick={() => submitMutation.mutate()}>
-              {submitMutation.isPending ? 'Submitting…' : 'Submit Quote'}
-            </button>
           </div>
-        </div>
+        )}
 
-        <p className="text-center text-xs text-gray-400 mt-4">Powered by ProcureAI · This link is unique to your company</p>
+        {/* ── STEP 0: Upload or Manual Entry ─────────────────────────────── */}
+        {step === 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+            <h2 className="font-semibold text-gray-800 mb-1">Submit Your Quote</h2>
+            <p className="text-sm text-gray-500 mb-4">Upload your quotation file and we'll extract the details automatically, or enter prices manually.</p>
+
+            {/* Mode tabs */}
+            <div className="flex gap-2 mb-5 border-b border-gray-100 pb-3">
+              <button
+                className={`flex items-center gap-2 text-sm px-4 py-2 rounded-lg font-medium transition ${inputMode === 'upload' ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                onClick={() => { setInputMode('upload'); setValidateError(''); }}
+              >
+                <Upload className="w-4 h-4" /> Upload File
+              </button>
+              <button
+                className={`flex items-center gap-2 text-sm px-4 py-2 rounded-lg font-medium transition ${inputMode === 'manual' ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                onClick={handleGoManual}
+              >
+                <PenLine className="w-4 h-4" /> Enter Manually
+              </button>
+            </div>
+
+            {/* Quote header fields — always visible */}
+            <div className="grid grid-cols-3 gap-3 mb-5">
+              <Field label="Payment Terms">
+                <input className="input" placeholder="e.g. Net 30, Advance" value={header.payment_terms} onChange={(e) => setHeader({ ...header, payment_terms: e.target.value })} />
+              </Field>
+              <Field label="Delivery Days">
+                <input className="input" type="number" placeholder="e.g. 7" value={header.delivery_time_days} onChange={(e) => setHeader({ ...header, delivery_time_days: e.target.value })} />
+              </Field>
+              <Field label="Valid Until">
+                <input className="input" type="date" value={header.validity_date} onChange={(e) => setHeader({ ...header, validity_date: e.target.value })} />
+              </Field>
+            </div>
+
+            {/* Upload mode */}
+            {inputMode === 'upload' && (
+              <div className="space-y-3">
+                <label className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-8 cursor-pointer transition ${file ? 'border-brand-400 bg-brand-50' : 'border-gray-300 hover:border-brand-400'}`}>
+                  <Upload className={`w-8 h-8 mb-2 ${file ? 'text-brand-500' : 'text-gray-400'}`} />
+                  {file ? (
+                    <div className="text-center">
+                      <p className="text-sm font-semibold text-brand-700">{file.name}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{(file.size / 1024).toFixed(0)} KB · Click to change</p>
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600 font-medium">Click to upload your quote file</p>
+                      <p className="text-xs text-gray-400 mt-1">PDF · Excel (.xlsx, .xls) · Image (JPG, PNG) · Max 20MB</p>
+                      <p className="text-xs text-gray-400">Handwritten, scanned, or digital — all supported</p>
+                    </div>
+                  )}
+                  <input type="file" className="hidden" accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png,.tiff,.csv" onChange={handleFileChange} />
+                </label>
+
+                {validateError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <p className="text-red-700 text-sm font-medium flex items-center gap-1.5 mb-1">
+                      <AlertTriangle className="w-4 h-4 shrink-0" /> Could not extract from file
+                    </p>
+                    <p className="text-red-600 text-xs">{validateError}</p>
+                    <button className="text-xs text-brand-600 hover:underline mt-2 font-medium" onClick={handleGoManual}>
+                      Switch to manual entry →
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    className="btn-primary flex-1 flex items-center justify-center gap-2"
+                    disabled={!file || validating}
+                    onClick={handleValidate}
+                  >
+                    {validating ? (
+                      <><RefreshCw className="w-4 h-4 animate-spin" /> Extracting with AI…</>
+                    ) : (
+                      <><RefreshCw className="w-4 h-4" /> Extract & Preview</>
+                    )}
+                  </button>
+                  <button className="btn-secondary" onClick={handleGoManual}>Enter Manually</button>
+                </div>
+
+                <p className="text-xs text-gray-400 text-center">
+                  AI reads your file, extracts item details, and shows them for your review before submission.
+                  Nothing is submitted until you confirm.
+                </p>
+              </div>
+            )}
+
+            {/* Manual entry mode */}
+            {inputMode === 'manual' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm font-medium text-gray-700">Quote Line Items</label>
+                  <button className="text-xs text-brand-600 flex items-center gap-1 hover:underline" onClick={addRow}>
+                    <Plus className="w-3 h-3" /> Add row
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border border-gray-200 rounded-xl overflow-hidden">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="table-th">Item Name *</th>
+                        <th className="table-th">Qty</th>
+                        <th className="table-th">Unit Price (₹)</th>
+                        <th className="table-th">Total (₹)</th>
+                        <th className="table-th">Tax (₹)</th>
+                        <th className="table-th">Freight (₹)</th>
+                        <th className="w-8" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white">
+                      {items.map((it, i) => (
+                        <tr key={i}>
+                          <td className="px-2 py-2"><input className="input text-sm min-w-32" value={it.item_name_raw} onChange={(e) => updateItem(i, 'item_name_raw', e.target.value)} placeholder="Item name" /></td>
+                          <td className="px-2 py-2"><input className="input w-16 text-sm" type="number" value={it.quantity} onChange={(e) => updateItem(i, 'quantity', e.target.value)} placeholder="0" /></td>
+                          <td className="px-2 py-2"><input className="input w-24 text-sm" type="number" value={it.unit_price} onChange={(e) => updateItem(i, 'unit_price', e.target.value)} placeholder="0" /></td>
+                          <td className="px-2 py-2 text-sm font-semibold text-gray-700">₹{Number(it.total_price || 0).toLocaleString('en-IN')}</td>
+                          <td className="px-2 py-2"><input className="input w-16 text-sm" type="number" value={it.tax} onChange={(e) => updateItem(i, 'tax', e.target.value)} placeholder="0" /></td>
+                          <td className="px-2 py-2"><input className="input w-16 text-sm" type="number" value={it.freight} onChange={(e) => updateItem(i, 'freight', e.target.value)} placeholder="0" /></td>
+                          <td className="px-2 py-2"><button onClick={() => removeRow(i)} className="text-red-400 hover:text-red-600 p-1"><Trash2 className="w-3.5 h-3.5" /></button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-gray-50">
+                      <tr>
+                        <td colSpan={3} className="px-4 py-2 text-right text-sm font-semibold text-gray-600">Total Amount</td>
+                        <td className="px-2 py-2 font-bold text-brand-700">₹{totalAmount.toLocaleString('en-IN')}</td>
+                        <td colSpan={3} />
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                <button
+                  className="btn-primary w-full"
+                  onClick={handleProceedManual}
+                  disabled={!items.some((i) => i.item_name_raw)}
+                >
+                  Review & Confirm →
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── STEP 1: Review & Confirm ────────────────────────────────────── */}
+        {step === 1 && (
+          <div className="space-y-4">
+            {extractionConfidence !== null && (
+              <div className={`rounded-xl border p-4 ${extractionConfidence >= 0.75 ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+                <div className="flex items-center gap-2 mb-1">
+                  {extractionConfidence >= 0.75 ? (
+                    <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  )}
+                  <p className={`text-sm font-semibold ${extractionConfidence >= 0.75 ? 'text-green-700' : 'text-amber-700'}`}>
+                    AI Extraction: {(extractionConfidence * 100).toFixed(0)}% confidence
+                    {extractionConfidence >= 0.75 ? ' — Looks good!' : ' — Please review carefully'}
+                  </p>
+                </div>
+                <p className={`text-xs ml-6 ${extractionConfidence >= 0.75 ? 'text-green-600' : 'text-amber-600'}`}>
+                  {extractionConfidence >= 0.75
+                    ? 'All items were extracted successfully. Review the details below and confirm if correct.'
+                    : 'Some fields may not have been read correctly (marked in amber). Edit any incorrect values before confirming.'}
+                </p>
+                {extractionNote && <p className="text-xs text-amber-700 mt-1 ml-6">⚠️ {extractionNote}</p>}
+              </div>
+            )}
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-semibold text-gray-800 flex items-center gap-2">
+                  <Edit3 className="w-4 h-4 text-brand-600" />
+                  Review Your Quote Details
+                </h2>
+                <button className="text-xs text-brand-600 hover:underline" onClick={() => setStep(0)}>← Edit</button>
+              </div>
+
+              {/* Header fields — editable */}
+              <div className="grid grid-cols-3 gap-3 mb-5">
+                <Field label="Payment Terms">
+                  <input className="input" value={header.payment_terms} onChange={(e) => setHeader({ ...header, payment_terms: e.target.value })} placeholder="e.g. Net 30" />
+                </Field>
+                <Field label="Delivery Days">
+                  <input className="input" type="number" value={header.delivery_time_days} onChange={(e) => setHeader({ ...header, delivery_time_days: e.target.value })} />
+                </Field>
+                <Field label="Valid Until">
+                  <input className="input" type="date" value={header.validity_date} onChange={(e) => setHeader({ ...header, validity_date: e.target.value })} />
+                </Field>
+              </div>
+
+              {/* Line items — fully editable */}
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-gray-700">Line Items</label>
+                <button className="text-xs text-brand-600 flex items-center gap-1 hover:underline" onClick={addRow}>
+                  <Plus className="w-3 h-3" /> Add row
+                </button>
+              </div>
+              <div className="overflow-x-auto mb-4">
+                <table className="min-w-full border border-gray-200 rounded-xl overflow-hidden">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="table-th">Item Name</th>
+                      <th className="table-th">Qty</th>
+                      <th className="table-th">Unit Price (₹)</th>
+                      <th className="table-th">Total (₹)</th>
+                      <th className="table-th">Tax (₹)</th>
+                      <th className="table-th">Freight (₹)</th>
+                      <th className="w-8" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {items.map((it, i) => (
+                      <tr key={i} className={it.confidence_score && it.confidence_score < 0.7 ? 'bg-amber-50' : ''}>
+                        <td className="px-2 py-2">
+                          <input className="input text-sm min-w-36" value={it.item_name_raw} onChange={(e) => updateItem(i, 'item_name_raw', e.target.value)} />
+                          {it.confidence_score && it.confidence_score < 0.7 && (
+                            <p className="text-xs text-amber-600 mt-0.5">⚠️ Low confidence — please verify</p>
+                          )}
+                        </td>
+                        <td className="px-2 py-2"><input className="input w-16 text-sm" type="number" value={it.quantity} onChange={(e) => updateItem(i, 'quantity', e.target.value)} /></td>
+                        <td className="px-2 py-2"><input className="input w-24 text-sm" type="number" value={it.unit_price} onChange={(e) => updateItem(i, 'unit_price', e.target.value)} /></td>
+                        <td className="px-2 py-2 text-sm font-semibold text-gray-700">₹{Number(it.total_price || 0).toLocaleString('en-IN')}</td>
+                        <td className="px-2 py-2"><input className="input w-16 text-sm" type="number" value={it.tax} onChange={(e) => updateItem(i, 'tax', e.target.value)} /></td>
+                        <td className="px-2 py-2"><input className="input w-16 text-sm" type="number" value={it.freight} onChange={(e) => updateItem(i, 'freight', e.target.value)} /></td>
+                        <td className="px-2 py-2"><button onClick={() => removeRow(i)} className="text-red-400 hover:text-red-600 p-1"><Trash2 className="w-3.5 h-3.5" /></button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-gray-50 border-t-2 border-gray-200">
+                    <tr>
+                      <td colSpan={3} className="px-4 py-2 text-right text-sm font-semibold text-gray-600">Grand Total</td>
+                      <td className="px-2 py-2 font-bold text-brand-700 text-base">₹{totalAmount.toLocaleString('en-IN')}</td>
+                      <td colSpan={3} />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700 mb-4">
+                ✅ By clicking Submit, you confirm that all prices, quantities, and terms above are correct and constitute your official quotation.
+              </div>
+
+              <div className="flex gap-3">
+                <button className="btn-secondary" onClick={() => setStep(0)}>← Back</button>
+                <button
+                  className="btn-primary flex-1 flex items-center justify-center gap-2"
+                  disabled={!items.some((i) => i.item_name_raw) || submitMutation.isPending}
+                  onClick={() => submitMutation.mutate()}
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  {submitMutation.isPending ? 'Submitting…' : 'Confirm & Submit Quote'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <p className="text-center text-xs text-gray-400 mt-6">Powered by ProcureAI · This link is unique to your company and should not be shared</p>
       </div>
     </div>
   );
