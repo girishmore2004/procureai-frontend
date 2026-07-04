@@ -75,6 +75,8 @@ export const rfqApi = {
 
 // QUOTES
 export const quotesApi = {
+  addItem: (quoteId, data) => api.post(`/quotes/${quoteId}/items`, data),
+  deleteItem: (quoteId, itemId) => api.delete(`/quotes/${quoteId}/items/${itemId}`),
   getOne: (id) => api.get(`/quotes/${id}`),
   reprocess: (id) => api.post(`/quotes/${id}/reprocess`),
   updateItem: (quoteId, itemId, data) => api.patch(`/quotes/${quoteId}/items/${itemId}`, data),
@@ -177,6 +179,11 @@ export const exportApi = {
 
 // PUBLIC (vendor quote submission)
 export const publicApi = {
+  validateQuote: (token, file) => {
+    const f = new FormData();
+    f.append('file', file);
+    return api.post(`/public/rfq/${token}/validate`, f, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
   getRfq: (token) => api.get(`/public/rfq/${token}`),
   submitQuote: (token, file, data) => {
     const f = new FormData();
