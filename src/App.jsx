@@ -33,7 +33,11 @@ import SettingsPage from './pages/SettingsPage';
 import AiAssistantPage from './pages/AiAssistantPage';
 import UsersPage from './pages/UsersPage';
 import VendorQuotePage from './pages/VendorQuotePage';
-
+import VendorPortalLoginPage from './pages/VendorPortalLoginPage';
+import VendorPortalDashboard from './pages/VendorPortalDashboard';
+import VendorPortalCatalogPage from './pages/VendorPortalCatalogPage';
+import VendorPortalProfilePage from './pages/VendorPortalProfilePage';
+import FindVendorPage from './pages/FindVendorPage';
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
   if (loading) return <div className="flex items-center justify-center h-screen"><Spinner size="lg" /></div>;
@@ -84,6 +88,15 @@ export default function App() {
         <Route path="/ai-assistant" element={<ProtectedRoute><AiAssistantPage /></ProtectedRoute>} />
         <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
 
+        {/* Vendor Portal — completely separate from company-user routes */}
+        <Route path="/vendor-portal/login" element={<VendorPortalLoginPage />} />
+        <Route path="/vendor-portal/dashboard" element={<VendorPortalDashboard />} />
+        <Route path="/vendor-portal/catalog" element={<VendorPortalCatalogPage />} />
+        <Route path="/vendor-portal/profile" element={<VendorPortalProfilePage />} />
+
+{/* Buyer-facing vendor discovery — inside company ProtectedRoute */}
+        <Route path="/find-vendor" element={<ProtectedRoute><FindVendorPage /></ProtectedRoute>} />
+        
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
