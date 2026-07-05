@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Users, Package, ShoppingCart, FileText, BarChart2,
   Bell, Settings, LogOut, ChevronDown, Truck, Receipt, Warehouse,
-  Boxes, ClipboardList, Building2, Menu, X, Bot,
+  Boxes, ClipboardList, Building2, Menu, X, Bot,Search,
 } from 'lucide-react';
 
 // Order matches the specified procurement workflow: Dashboard, Inventory,
@@ -17,6 +17,8 @@ const NAV = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', perm: null },
   { to: '/inventory', icon: Boxes, label: 'Inventory', perm: 'items.view' },
   { to: '/items', icon: Package, label: 'Item Master', perm: 'items.view' },
+  // Add after the Vendor nav item:
+  { to: '/find-vendor', icon: Search, label: 'Find Vendor', perm: 'vendors.view' },
   { to: '/vendors', icon: Building2, label: 'Vendor', perm: 'vendors.view' },
   { to: '/purchase-requests', icon: ClipboardList, label: 'Purchase Request', perm: 'pr.view' },
   { to: '/approvals', icon: ShoppingCart, label: 'Approvals', perm: ['pr.approve', 'po.approve', 'invoices.approve'] },
