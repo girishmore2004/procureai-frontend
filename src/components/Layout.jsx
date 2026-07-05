@@ -7,32 +7,40 @@ import {
   Boxes, ClipboardList, Building2, Menu, X, Bot,
 } from 'lucide-react';
 
+// Order matches the specified procurement workflow: Dashboard, Inventory,
+// Item Master, Vendor, Purchase Request, Approvals, RFQ, Purchase Order,
+// Goods Receipt, Invoice, AI Recommendation, Analytics, Settings.
+// perm can be a single code (string) or an array — arrays mean "visible if
+// the user has ANY of these" (used for Approvals, since pr/po/invoice
+// approvers are different roles but all belong on the same nav item).
 const NAV = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', perm: null },
-  { to: '/purchase-requests', icon: ClipboardList, label: 'Purchase Requests', perm: 'pr.view' },
-  { to: '/rfqs', icon: FileText, label: 'RFQs', perm: 'rfq.view' },
-  { to: '/approvals', icon: ShoppingCart, label: 'Approvals', perm: null },
-  { to: '/purchase-orders', icon: Receipt, label: 'Purchase Orders', perm: 'po.view' },
-  { to: '/goods-receipts', icon: Warehouse, label: 'Goods Receipts', perm: 'grn.view' },
-  { to: '/invoices', icon: FileText, label: 'Invoices', perm: 'invoices.view' },
-  { to: '/vendors', icon: Building2, label: 'Vendors', perm: 'vendors.view' },
-  { to: '/items', icon: Package, label: 'Item Master', perm: 'items.view' },
   { to: '/inventory', icon: Boxes, label: 'Inventory', perm: 'items.view' },
-  { to: '/analytics', icon: BarChart2, label: 'Analytics', perm: 'analytics.view' },
-  { to: '/notifications', icon: Bell, label: 'Notifications', perm: null },
-  { to: '/audit-logs', icon: ClipboardList, label: 'Audit Logs', perm: 'audit.view' },
+  { to: '/items', icon: Package, label: 'Item Master', perm: 'items.view' },
+  { to: '/vendors', icon: Building2, label: 'Vendor', perm: 'vendors.view' },
+  { to: '/purchase-requests', icon: ClipboardList, label: 'Purchase Request', perm: 'pr.view' },
+  { to: '/approvals', icon: ShoppingCart, label: 'Approvals', perm: ['pr.approve', 'po.approve', 'invoices.approve'] },
+  { to: '/rfqs', icon: FileText, label: 'RFQ', perm: 'rfq.view' },
+  { to: '/purchase-orders', icon: Receipt, label: 'Purchase Order', perm: 'po.view' },
+  { to: '/goods-receipts', icon: Warehouse, label: 'Goods Receipt', perm: 'grn.view' },
+  { to: '/invoices', icon: FileText, label: 'Invoice', perm: 'invoices.view' },
+  { to: '/ai-assistant', icon: Bot, label: 'AI Recommendation', perm: null },
+  { to: '/analytics', icon: BarChart2, label: 'Analytics / Reports', perm: 'analytics.view' },
   { to: '/settings', icon: Settings, label: 'Settings', perm: 'settings.view' },
-  { to: '/ai-assistant', icon: Bot, label: 'AI Assistant', perm: null },
+  // Utility items — not part of the 13-step workflow, kept below a divider.
+  { to: '/notifications', icon: Bell, label: 'Notifications', perm: null, utility: true },
+  { to: '/audit-logs', icon: ClipboardList, label: 'Audit Logs', perm: 'audit.view', utility: true },
 ];
 
 export default function Layout({ children }) {
-  const { user, logout, can } = useAuth();
+  const { user, logout, can, canAny } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = () => { logout(); navigate('/login'); };
 
-  const visibleNav = NAV.filter((n) => !n.perm || can(n.perm));
+  const hasAccess = (n) => !n.perm || (Array.isArray(n.perm) ? canAny(...n.perm) : can(n.perm));
+  const visibleNav = NAV.filter(hasAccess);
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
@@ -45,13 +53,19 @@ export default function Layout({ children }) {
         </div>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {visibleNav.map(({ to, icon: Icon, label }) => (
-          <NavLink key={to} to={to} onClick={() => setSidebarOpen(false)}
-            className={({ isActive }) => isActive ? 'sidebar-link-active' : 'sidebar-link'}>
-            <Icon className="w-4 h-4 shrink-0" />
-            <span>{label}</span>
-          </NavLink>
-        ))}
+        {visibleNav.map(({ to, icon: Icon, label, utility }, idx) => {
+          const prevUtility = idx > 0 ? visibleNav[idx - 1].utility : false;
+          return (
+            <React.Fragment key={to}>
+              {utility && !prevUtility && <div className="my-2 border-t border-gray-200" />}
+              <NavLink to={to} onClick={() => setSidebarOpen(false)}
+                className={({ isActive }) => isActive ? 'sidebar-link-active' : 'sidebar-link'}>
+                <Icon className="w-4 h-4 shrink-0" />
+                <span>{label}</span>
+              </NavLink>
+            </React.Fragment>
+          );
+        })}
       </nav>
       <div className="px-3 py-4 border-t border-gray-200">
         <div className="flex items-center gap-3 px-2 mb-3">
