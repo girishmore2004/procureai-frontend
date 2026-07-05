@@ -39,6 +39,26 @@ export const vendorsApi = {
   compare: (ids) => api.get('/vendors/compare', { params: { ids: ids.join(',') } }),
 };
 
+// Vendor Portal (vendor-side, uses separate token)
+export const vendorPortalApi = {
+  login: (data) => api.post('/vendor-portal/login', data),
+  setPassword: (data) => api.post('/vendor-portal/set-password', data),
+  getMe: () => api.get('/vendor-portal/me'),
+  updateMe: (data) => api.patch('/vendor-portal/me', data),
+  changePassword: (data) => api.patch('/vendor-portal/change-password', data),
+  listCatalog: () => api.get('/vendor-portal/catalog'),
+  addCatalogItem: (data) => api.post('/vendor-portal/catalog', data),
+  updateCatalogItem: (id, data) => api.patch(`/vendor-portal/catalog/${id}`, data),
+  deleteCatalogItem: (id) => api.delete(`/vendor-portal/catalog/${id}`),
+};
+
+// Vendor Discovery (buyer-side)
+export const vendorDiscoveryApi = {
+  search: (params) => api.get('/vendor-discovery/search', { params }),
+  getCategories: () => api.get('/vendor-discovery/categories'),
+  matchItem: (itemId) => api.get(`/vendor-discovery/match-item/${itemId}`),
+};
+
 // ITEMS
 export const itemsApi = {
   list: (params) => api.get('/items', { params }),
