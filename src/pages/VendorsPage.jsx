@@ -37,10 +37,15 @@ export default function VendorsPage() {
     const file = e.target.files[0]; if (!file) return;
     try {
       const { data: d } = await vendorsApi.importCsv(file);
-      toast.success(`Imported ${d.data.created} vendors`);
+      const { created, total, errors } = d.data;
+      if (errors?.length) {
+        toast.error(`Imported ${created} of ${total}. ${errors.length} row(s) failed — first issue: ${errors[0].message}`, { duration: 8000 });
+      } else {
+        toast.success(`Imported ${created} vendors`);
+      }
       qc.invalidateQueries(['vendors']);
       setImportOpen(false);
-    } catch { toast.error('Import failed'); }
+    } catch (err) { toast.error(err.response?.data?.error?.message || 'Import failed'); }
   };
 
   const vendors = data?.data || [];
@@ -114,7 +119,7 @@ export default function VendorsPage() {
 
       {/* Import Modal */}
       <Modal open={importOpen} onClose={() => setImportOpen(false)} title="Import Vendors" size="sm">
-        <p className="text-sm text-gray-500 mb-4">Upload CSV/Excel with: name, email, phone, gstin, payment_terms, lead_time_days</p>
+        <p className="text-sm text-gray-500 mb-4">Upload CSV/Excel. Column headers can be named flexibly — e.g. "Vendor Name", "GST No", "Mobile" are all recognized.</p>
         <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 cursor-pointer hover:border-brand-400">
           <Upload className="w-6 h-6 text-gray-400 mb-2" />
           <span className="text-sm text-gray-500">Click to upload</span>
