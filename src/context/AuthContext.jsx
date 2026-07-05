@@ -34,9 +34,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const can = (permission) => user?.permissions?.includes(permission);
+  const canAny = (...permissions) => permissions.some((p) => user?.permissions?.includes(p));
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, can, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, can, canAny, loading }}>
       {children}
     </AuthContext.Provider>
   );
