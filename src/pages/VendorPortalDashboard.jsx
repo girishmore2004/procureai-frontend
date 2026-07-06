@@ -45,6 +45,7 @@ export function VendorPortalLayout({ children, title }) {
         <div className="flex items-center gap-4">
           <Link to="/vendor-portal/dashboard" className="text-sm text-gray-600 hover:text-brand-600">Dashboard</Link>
           <Link to="/vendor-portal/catalog" className="text-sm text-gray-600 hover:text-brand-600">My Catalog</Link>
+          <Link to="/vendor-portal/orders" className="text-sm text-gray-600 hover:text-brand-600">My Orders</Link>
           <Link to="/vendor-portal/profile" className="text-sm text-gray-600 hover:text-brand-600">Profile</Link>
           <button onClick={logout} className="flex items-center gap-1 text-sm text-red-500 hover:text-red-700">
             <LogOut className="w-4 h-4" /> Sign out
@@ -102,6 +103,9 @@ export default function VendorPortalDashboard() {
           <div className="space-y-2">
             <Link to="/vendor-portal/catalog" className="flex items-center gap-2 p-3 rounded-lg border border-gray-100 hover:bg-gray-50 text-sm font-medium">
               <Package className="w-4 h-4 text-brand-600" /> Manage My Catalog
+            </Link>
+            <Link to="/vendor-portal/orders" className="flex items-center gap-2 p-3 rounded-lg border border-gray-100 hover:bg-gray-50 text-sm font-medium">
+              <Package className="w-4 h-4 text-brand-600" /> View My Orders & Messages
             </Link>
             <Link to="/vendor-portal/profile" className="flex items-center gap-2 p-3 rounded-lg border border-gray-100 hover:bg-gray-50 text-sm font-medium">
               <User className="w-4 h-4 text-brand-600" /> Update My Profile
