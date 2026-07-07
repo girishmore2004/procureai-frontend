@@ -51,9 +51,17 @@ export const vendorPortalApi = {
   addCatalogItem: (data) => api.post('/vendor-portal/catalog', data),
   updateCatalogItem: (id, data) => api.patch(`/vendor-portal/catalog/${id}`, data),
   deleteCatalogItem: (id) => api.delete(`/vendor-portal/catalog/${id}`),
+  listDocuments: () => api.get('/vendor-portal/documents'),
+  uploadDocument: (file, type) => {
+    const f = new FormData();
+    f.append('file', file);
+    if (type) f.append('type', type);
+    return api.post('/vendor-portal/documents', f, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
 };
 
-// Public company search (vendor self-signup — "find your buyer")
+// Public company search (kept for potential future use — no longer called
+// from vendor signup, which no longer requires picking a buyer company)
 export const publicCompanyApi = {
   search: (q) => api.get('/public/companies/search', { params: { q } }),
 };
