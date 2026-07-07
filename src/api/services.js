@@ -130,6 +130,7 @@ export const poApi = {
   create: (data) => api.post('/purchase-orders', data),
   getOne: (id) => api.get(`/purchase-orders/${id}`),
   update: (id, data) => api.patch(`/purchase-orders/${id}`, data),
+  submit: (id) => api.post(`/purchase-orders/${id}/submit`),
   send: (id) => api.post(`/purchase-orders/${id}/send`),
   downloadPdf: (id) => api.get(`/purchase-orders/${id}/pdf`, { responseType: 'blob' }),
 };
@@ -149,6 +150,7 @@ export const invoicesApi = {
   getOne: (id) => api.get(`/invoices/${id}`),
   match: (id) => api.post(`/invoices/${id}/match`),
   approve: (id) => api.post(`/invoices/${id}/approve`),
+  markPaid: (id) => api.post(`/invoices/${id}/mark-paid`),
   updateItem: (invoiceId, itemId, data) => api.patch(`/invoices/${invoiceId}/items/${itemId}`, data),
 };
 
