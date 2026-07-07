@@ -41,6 +41,7 @@ export const vendorsApi = {
 
 // Vendor Portal (vendor-side, uses separate token)
 export const vendorPortalApi = {
+  signup: (data) => api.post('/vendor-portal/signup', data),
   login: (data) => api.post('/vendor-portal/login', data),
   setPassword: (data) => api.post('/vendor-portal/set-password', data),
   getMe: () => api.get('/vendor-portal/me'),
@@ -50,6 +51,11 @@ export const vendorPortalApi = {
   addCatalogItem: (data) => api.post('/vendor-portal/catalog', data),
   updateCatalogItem: (id, data) => api.patch(`/vendor-portal/catalog/${id}`, data),
   deleteCatalogItem: (id) => api.delete(`/vendor-portal/catalog/${id}`),
+};
+
+// Public company search (vendor self-signup — "find your buyer")
+export const publicCompanyApi = {
+  search: (q) => api.get('/public/companies/search', { params: { q } }),
 };
 
 // Vendor Discovery (buyer-side)
