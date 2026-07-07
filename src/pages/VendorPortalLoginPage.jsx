@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ShoppingCart, Eye, EyeOff } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { ShoppingCart, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api/client';
 
@@ -42,7 +42,7 @@ export default function VendorPortalLoginPage() {
             <span className="text-2xl font-bold text-gray-900">ProcureAI</span>
           </div>
           <h1 className="text-gray-700 text-base">Vendor Portal Login</h1>
-          <p className="text-xs text-gray-400 mt-1">Use the credentials sent by your buyer</p>
+          <p className="text-xs text-gray-400 mt-1">Sign in with your vendor portal account</p>
         </div>
         <div className="card">
           {error && (
@@ -64,14 +64,23 @@ export default function VendorPortalLoginPage() {
                   {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              <div className="flex justify-end mt-1">
+                <Link to="/vendor-portal/forgot-password" className="text-xs text-brand-600 hover:underline">Forgot password?</Link>
+              </div>
             </div>
             <button type="submit" disabled={loading} className="btn-primary w-full">
               {loading ? 'Signing in…' : 'Sign in to Vendor Portal'}
             </button>
           </form>
           <p className="text-center text-xs text-gray-400 mt-4">
-            New vendor? <a href="/vendor-portal/signup" className="text-brand-600 hover:underline">Create an account</a>
+            New vendor? <Link to="/vendor-portal/signup" className="text-brand-600 hover:underline">Create an account</Link>
           </p>
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100 text-xs text-gray-500">
+            <Link to="/" className="flex items-center gap-1 hover:text-brand-600">
+              <ArrowLeft className="w-3 h-3" /> Back to home
+            </Link>
+            <Link to="/login" className="hover:text-brand-600">Buyer login</Link>
+          </div>
         </div>
       </div>
     </div>
