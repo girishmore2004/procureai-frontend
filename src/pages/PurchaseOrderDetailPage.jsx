@@ -3,8 +3,8 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { poApi } from '../api/services';
 import api from '../api/client';
-import { StatusBadge, PageLoader } from '../components/ui';
-import { Send, Download, FileText, MessageSquare, RefreshCw } from 'lucide-react';
+import { StatusBadge, PageLoader, Alert } from '../components/ui';
+import { Send, Download, FileText, MessageSquare, RefreshCw, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { safeFormatDistanceToNow } from '../utils/date';
 
@@ -28,6 +28,17 @@ export default function PurchaseOrderDetailPage() {
   const sendMutation = useMutation({
     mutationFn: () => poApi.send(id),
     onSuccess: () => { toast.success('PO sent to vendor'); qc.invalidateQueries(['po', id]); },
+    onError: (e) => toast.error(e.response?.data?.error?.message || 'Failed'),
+  });
+
+  const submitMutation = useMutation({
+    mutationFn: () => poApi.submit(id),
+    onSuccess: (res) => {
+      const { status } = res.data.data;
+      toast.success(status === 'approved' ? 'PO auto-approved — ready to send' : 'Submitted for approval');
+      qc.invalidateQueries(['po', id]);
+      qc.invalidateQueries(['pending-approvals-full']);
+    },
     onError: (e) => toast.error(e.response?.data?.error?.message || 'Failed'),
   });
 
@@ -56,7 +67,8 @@ export default function PurchaseOrderDetailPage() {
   if (isLoading) return <PageLoader />;
   if (!po) return <div className="card text-gray-500">PO not found</div>;
 
-  const steps = ['draft', 'sent', 'partially_received', 'received', 'closed'];
+  // 'rejected' isn't on the happy-path timeline — handled separately below.
+  const steps = ['draft', 'pending_approval', 'approved', 'sent', 'partially_received', 'received', 'closed'];
   const currentStep = steps.indexOf(po.status);
 
   return (
@@ -66,6 +78,8 @@ export default function PurchaseOrderDetailPage() {
         <span>/</span>
         <span className="text-gray-900 font-medium">{po.po_number}</span>
       </div>
+
+      {po.status === 'rejected' && <Alert type="error" message="This PO was rejected during approval. Check the Approvals page for the reviewer's comments." />}
 
       <div className="card">
         <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
@@ -79,7 +93,17 @@ export default function PurchaseOrderDetailPage() {
             <button className="btn-secondary flex items-center gap-2" onClick={downloadPdf}>
               <Download className="w-4 h-4" /> PDF
             </button>
-            {['draft', 'approved'].includes(po.status) && (
+            {po.status === 'draft' && (
+              <button className="btn-primary flex items-center gap-2"
+                onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending}>
+                <CheckCircle2 className="w-4 h-4" />
+                {submitMutation.isPending ? 'Submitting…' : 'Submit for Approval'}
+              </button>
+            )}
+            {po.status === 'pending_approval' && (
+              <span className="badge-amber flex items-center px-3">Awaiting approval</span>
+            )}
+            {po.status === 'approved' && (
               <button className="btn-primary flex items-center gap-2"
                 onClick={() => sendMutation.mutate()} disabled={sendMutation.isPending}>
                 <Send className="w-4 h-4" />
