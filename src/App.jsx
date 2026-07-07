@@ -40,6 +40,7 @@ import FindVendorPage from './pages/FindVendorPage';
 
 // Vendor portal pages (separate auth, no company Layout)
 import VendorPortalLoginPage from './pages/VendorPortalLoginPage';
+import VendorPortalSignupPage from './pages/VendorPortalSignupPage';
 import VendorPortalDashboard from './pages/VendorPortalDashboard';
 import VendorPortalCatalogPage from './pages/VendorPortalCatalogPage';
 import VendorPortalProfilePage from './pages/VendorPortalProfilePage';
@@ -86,6 +87,7 @@ export default function App() {
 
         {/* ── Vendor portal (separate auth, no company Layout) ─────────── */}
         <Route path="/vendor-portal/login" element={<VendorPortalLoginPage />} />
+        <Route path="/vendor-portal/signup" element={<VendorPortalSignupPage />} />
         <Route path="/vendor-portal/dashboard" element={<VendorPortalDashboard />} />
         <Route path="/vendor-portal/catalog" element={<VendorPortalCatalogPage />} />
         <Route path="/vendor-portal/profile" element={<VendorPortalProfilePage />} />
