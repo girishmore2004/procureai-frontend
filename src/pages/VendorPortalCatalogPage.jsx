@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { VendorPortalLayout } from './VendorPortalDashboard';
 import api from '../api/client';
-import { Plus, Trash2, Edit3, CheckCircle, X } from 'lucide-react';
+import { Plus, Trash2, Edit3, CheckCircle, X, Package } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const CATS = ['Raw Materials', 'Electrical', 'Mechanical', 'Civil', 'Plumbing',
