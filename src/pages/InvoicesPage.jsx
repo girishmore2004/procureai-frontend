@@ -106,6 +106,17 @@ export function InvoiceDetailPage() {
   const approveMutation = useMutation({
     mutationFn: () => invoicesApi.approve(id),
     onSuccess: () => { toast.success('Invoice approved for payment'); qc.invalidateQueries(['invoice', id]); },
+    onError: (e) => toast.error(e.response?.data?.error?.message || 'Failed'),
+  });
+
+  // Previously there was no way to ever record that a vendor was actually
+  // paid — "Approve for Payment" only changed match_status, and once it did,
+  // the button vanished (it required match_status === 'matched') with no
+  // further action available. This closes that gap.
+  const markPaidMutation = useMutation({
+    mutationFn: () => invoicesApi.markPaid(id),
+    onSuccess: () => { toast.success('Invoice marked as paid'); qc.invalidateQueries(['invoice', id]); qc.invalidateQueries(['invoices']); },
+    onError: (e) => toast.error(e.response?.data?.error?.message || 'Failed'),
   });
 
   if (isLoading) return <PageLoader />;
@@ -130,6 +141,7 @@ export function InvoiceDetailPage() {
           <div className="flex gap-2">
             {invoice.match_status === 'pending' && <button className="btn-secondary flex items-center gap-2" onClick={() => matchMutation.mutate()} disabled={matchMutation.isPending}><GitMerge className="w-4 h-4" />{matchMutation.isPending ? 'Matching…' : 'Run 3-Way Match'}</button>}
             {invoice.match_status === 'matched' && invoice.payment_status === 'unpaid' && <button className="btn-primary flex items-center gap-2" onClick={() => approveMutation.mutate()} disabled={approveMutation.isPending}><CheckCircle className="w-4 h-4" />Approve for Payment</button>}
+            {invoice.match_status === 'approved' && invoice.payment_status === 'unpaid' && <button className="btn-primary flex items-center gap-2" onClick={() => markPaidMutation.mutate()} disabled={markPaidMutation.isPending}><CheckCircle className="w-4 h-4" />{markPaidMutation.isPending ? 'Marking…' : 'Mark as Paid'}</button>}
             <StatusBadge status={invoice.match_status} />
             <StatusBadge status={invoice.payment_status} />
           </div>
@@ -139,6 +151,7 @@ export function InvoiceDetailPage() {
           <div><p className="text-xs text-gray-400">Total Amount</p><p className="font-bold text-brand-700">₹{Number(invoice.total_amount || 0).toLocaleString('en-IN')}</p></div>
           <div><p className="text-xs text-gray-400">Match Type</p><p className="font-medium">{invoice.match_type || 'Pending'}</p></div>
           <div><p className="text-xs text-gray-400">Source</p>{invoice.file_url ? <a href={invoice.file_url} target="_blank" rel="noopener noreferrer" className="text-brand-600 text-xs hover:underline">View File</a> : <p>—</p>}</div>
+          <div><p className="text-xs text-gray-400">Paid On</p><p className="font-medium">{invoice.paid_at ? new Date(invoice.paid_at).toLocaleDateString('en-IN') : '—'}</p></div>
         </div>
 
         <h2 className="text-sm font-semibold text-gray-500 uppercase mb-3">Extracted Line Items</h2>
