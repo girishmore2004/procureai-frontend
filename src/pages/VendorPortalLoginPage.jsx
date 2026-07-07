@@ -70,7 +70,7 @@ export default function VendorPortalLoginPage() {
             </button>
           </form>
           <p className="text-center text-xs text-gray-400 mt-4">
-            Buyer login? <a href="/login" className="text-brand-600 hover:underline">Click here</a>
+            New vendor? <a href="/vendor-portal/signup" className="text-brand-600 hover:underline">Create an account</a>
           </p>
         </div>
       </div>
