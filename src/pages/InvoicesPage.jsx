@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { invoicesApi, vendorsApi, poApi } from '../api/services';
+import { toAbsoluteFileUrl } from '../api/client';
 import { Table, EmptyState, StatusBadge, PageLoader, Alert, Modal, Field } from '../components/ui';
 import { Upload, CheckCircle, GitMerge, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -150,13 +151,13 @@ export function InvoiceDetailPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4 pb-4 border-b border-gray-100">
           <div><p className="text-xs text-gray-400">Total Amount</p><p className="font-bold text-brand-700">₹{Number(invoice.total_amount || 0).toLocaleString('en-IN')}</p></div>
           <div><p className="text-xs text-gray-400">Match Type</p><p className="font-medium">{invoice.match_type || 'Pending'}</p></div>
-          <div><p className="text-xs text-gray-400">Source</p>{invoice.file_url ? <a href={invoice.file_url} target="_blank" rel="noopener noreferrer" className="text-brand-600 text-xs hover:underline">View File</a> : <p>—</p>}</div>
+          <div><p className="text-xs text-gray-400">Source</p>{toAbsoluteFileUrl(invoice.file_url) ? <a href={toAbsoluteFileUrl(invoice.file_url)} target="_blank" rel="noopener noreferrer" className="text-brand-600 text-xs hover:underline">View File</a> : <p className="text-xs text-gray-400">{invoice.file_url ? 'File unavailable' : '—'}</p>}</div>
           <div><p className="text-xs text-gray-400">Paid On</p><p className="font-medium">{invoice.paid_at ? new Date(invoice.paid_at).toLocaleDateString('en-IN') : '—'}</p></div>
         </div>
 
         <h2 className="text-sm font-semibold text-gray-500 uppercase mb-3">Extracted Line Items</h2>
         <table className="min-w-full divide-y divide-gray-100 border border-gray-200 rounded-lg">
-          <thead className="bg-gray-50"><tr><th className="table-th">Item</th><th className="table-th">Qty</th><th className="table-th">Unit Price</th><th className="table-th">Total</th><th className="table-th">Confidence</th></tr></thead>
+          <thead className="bg-gray-50"><tr><th className="table-th">Item</th><th className="table-th">Qty</th><th className="table-th">Unit Price</th><th className="table-th">Total</th><th className="table-th">Tax</th><th className="table-th">Freight</th><th className="table-th">Discount</th><th className="table-th">Confidence</th></tr></thead>
           <tbody className="divide-y divide-gray-50">
             {invoice.items?.map((it) => (
               <tr key={it.id} className={it.confidence_score < 0.7 ? 'bg-amber-50' : ''}>
@@ -164,10 +165,13 @@ export function InvoiceDetailPage() {
                 <td className="table-td">{it.quantity}</td>
                 <td className="table-td">₹{Number(it.unit_price || 0).toLocaleString('en-IN')}</td>
                 <td className="table-td font-medium">₹{Number(it.total_price || 0).toLocaleString('en-IN')}</td>
+                <td className="table-td text-xs">{it.tax ? `₹${Number(it.tax).toLocaleString('en-IN')}` : '—'}</td>
+                <td className="table-td text-xs">{it.freight ? `₹${Number(it.freight).toLocaleString('en-IN')}` : '—'}</td>
+                <td className="table-td text-xs">{it.discount ? `₹${Number(it.discount).toLocaleString('en-IN')}` : '—'}</td>
                 <td className="table-td"><span className={`text-xs font-semibold ${it.confidence_score >= 0.8 ? 'text-green-600' : 'text-amber-600'}`}>{it.confidence_score ? `${(it.confidence_score * 100).toFixed(0)}%` : '—'}</span></td>
               </tr>
             ))}
-            {!invoice.items?.length && <tr><td colSpan={5} className="text-center py-6 text-sm text-gray-400">Extracting invoice data…</td></tr>}
+            {!invoice.items?.length && <tr><td colSpan={8} className="text-center py-6 text-sm text-gray-400">Extracting invoice data…</td></tr>}
           </tbody>
         </table>
       </div>
