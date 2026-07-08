@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { rfqApi, quotesApi, vendorsApi } from '../api/services';
+import { toAbsoluteFileUrl } from '../api/client';
 import { Table, EmptyState, StatusBadge, Modal, Field, Alert, PageLoader, Spinner } from '../components/ui';
 import { Send, Bell, Star, CheckCircle, AlertTriangle, Bot, ThumbsUp, Copy, ExternalLink, Loader2, UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -355,7 +356,7 @@ export function QuoteDetailPage() {
             {extracting && <Spinner size="sm" />}
             <StatusBadge status={quote.extraction_status} />
             {quote.ai_confidence && <span className="badge-gray">AI Confidence: {(quote.ai_confidence * 100).toFixed(0)}%</span>}
-            {quote.source_file_url && <a href={quote.source_file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-600 hover:underline">View Source File</a>}
+            {toAbsoluteFileUrl(quote.source_file_url) ? <a href={toAbsoluteFileUrl(quote.source_file_url)} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-600 hover:underline">View Source File</a> : quote.source_file_url ? <span className="text-xs text-gray-400">File unavailable</span> : null}
           </div>
         </div>
 
