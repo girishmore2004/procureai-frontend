@@ -49,7 +49,12 @@ export default function Layout({ children }) {
     if (n.platformOnly) return !!user?.is_platform_admin;
     return !n.perm || (Array.isArray(n.perm) ? canAny(...n.perm) : can(n.perm));
   };
-  const visibleNav = NAV.filter(hasAccess);
+  // Platform-admin accounts are cross-company oversight only — they still
+  // technically belong to a company/role underneath, but showing them the
+  // full 13-step buyer workflow sidebar alongside Platform Overview would
+  // be confusing and isn't what that account is for. Keep their sidebar to
+  // just the one item.
+  const visibleNav = user?.is_platform_admin ? NAV.filter((n) => n.platformOnly) : NAV.filter(hasAccess);
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
@@ -66,7 +71,7 @@ export default function Layout({ children }) {
           const prevUtility = idx > 0 ? visibleNav[idx - 1].utility : false;
           return (
             <React.Fragment key={to}>
-              {utility && !prevUtility && <div className="my-2 border-t border-gray-200" />}
+              {utility && !prevUtility && idx > 0 && <div className="my-2 border-t border-gray-200" />}
               <NavLink to={to} onClick={() => setSidebarOpen(false)}
                 className={({ isActive }) => isActive ? 'sidebar-link-active' : 'sidebar-link'}>
                 <Icon className="w-4 h-4 shrink-0" />
