@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Users, Package, ShoppingCart, FileText, BarChart2,
   Bell, Settings, LogOut, ChevronDown, Truck, Receipt, Warehouse,
-  Boxes, ClipboardList, Building2, Menu, X, Bot,Search,
+  Boxes, ClipboardList, Building2, Menu, X, Bot,Search, ShieldCheck,
 } from 'lucide-react';
 
 // Order matches the specified procurement workflow: Dashboard, Inventory,
@@ -32,6 +32,10 @@ const NAV = [
   // Utility items — not part of the 13-step workflow, kept below a divider.
   { to: '/notifications', icon: Bell, label: 'Notifications', perm: null, utility: true },
   { to: '/audit-logs', icon: ClipboardList, label: 'Audit Logs', perm: 'audit.view', utility: true },
+  // Not a company permission — gated by the is_platform_admin flag on the
+  // user record (see backend middleware/auth.js requirePlatformAdmin).
+  // Only ever visible to the handful of trusted platform-admin accounts.
+  { to: '/platform', icon: ShieldCheck, label: 'Platform Overview', perm: null, utility: true, platformOnly: true },
 ];
 
 export default function Layout({ children }) {
@@ -41,7 +45,10 @@ export default function Layout({ children }) {
 
   const handleLogout = () => { logout(); navigate('/login'); };
 
-  const hasAccess = (n) => !n.perm || (Array.isArray(n.perm) ? canAny(...n.perm) : can(n.perm));
+  const hasAccess = (n) => {
+    if (n.platformOnly) return !!user?.is_platform_admin;
+    return !n.perm || (Array.isArray(n.perm) ? canAny(...n.perm) : can(n.perm));
+  };
   const visibleNav = NAV.filter(hasAccess);
 
   const SidebarContent = () => (
