@@ -20,7 +20,9 @@ export default function LoginPage() {
     try {
       const { data } = await authApi.login(form);
       login(data.data.user, data.data.access_token, data.data.refresh_token);
-      navigate('/dashboard');
+      // Platform-admin accounts (cross-company oversight) skip the regular
+      // buyer dashboard entirely and land on their own dedicated view.
+      navigate(data.data.user.is_platform_admin ? '/platform' : '/dashboard');
     } catch (err) {
       setError(err.response?.data?.error?.message || 'Login failed');
     } finally {
