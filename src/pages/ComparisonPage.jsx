@@ -97,6 +97,13 @@ export default function ComparisonPage() {
         />
       )}
 
+      {readyQuotes.some((q) => q.has_request_mismatch) && (
+        <Alert
+          type="warning"
+          message="One or more vendors quoted items or quantities that differ from what was requested on this RFQ — see “Requested vs Quoted” below."
+        />
+      )}
+
       {failedVendors.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
@@ -331,6 +338,85 @@ export default function ComparisonPage() {
                                 </div>
                               ) : (
                                 <span className="text-gray-300 text-xs">Not quoted</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  });
+                })()}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Requested vs Quoted */}
+      {readyQuotes.length > 0 && (
+        <div className="card">
+          <h2 className="text-base mb-1">Requested vs Quoted</h2>
+          <p className="text-xs text-gray-500 mb-4">
+            Checks each vendor's quote against what was actually requested on this RFQ's purchase request.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-2 pr-4 text-xs font-semibold text-gray-500 min-w-[180px]">Item</th>
+                  <th className="text-center py-2 px-3 text-xs font-semibold text-gray-500">Requested Qty</th>
+                  {readyQuotes.map((q) => (
+                    <th key={q.quote_id} className="text-center py-2 px-3 text-xs font-semibold text-gray-500 min-w-[150px]">
+                      {q.vendor?.name}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {(() => {
+                  const rows = [...new Set(
+                    readyQuotes.flatMap((q) => (q.requested_item_comparison || []).map((c) => c.item_name))
+                  )];
+
+                  if (!rows.length) {
+                    return (
+                      <tr>
+                        <td colSpan={2 + readyQuotes.length} className="text-center py-6 text-sm text-gray-400">
+                          No requested items found on this RFQ's purchase request to compare against.
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  const statusBadge = {
+                    matched: { label: 'Matched', cls: 'text-green-700 bg-green-50' },
+                    quantity_mismatch: { label: 'Qty mismatch', cls: 'text-amber-700 bg-amber-50' },
+                    price_mismatch: { label: 'Price mismatch', cls: 'text-amber-700 bg-amber-50' },
+                    quantity_and_price_mismatch: { label: 'Qty & price mismatch', cls: 'text-red-700 bg-red-50' },
+                    not_quoted: { label: 'Not quoted', cls: 'text-gray-500 bg-gray-100' },
+                    not_requested: { label: 'Extra (not requested)', cls: 'text-blue-700 bg-blue-50' },
+                  };
+
+                  return rows.map((itemName) => {
+                    const requestedQty = readyQuotes
+                      .map((q) => q.requested_item_comparison?.find((c) => c.item_name === itemName))
+                      .find((c) => c?.requested_quantity != null)?.requested_quantity;
+
+                    return (
+                      <tr key={itemName} className="hover:bg-gray-50">
+                        <td className="py-2 pr-4 text-sm text-gray-700 font-medium">{itemName}</td>
+                        <td className="py-2 px-3 text-center text-sm text-gray-500">{requestedQty != null ? requestedQty : '—'}</td>
+                        {readyQuotes.map((q) => {
+                          const c = q.requested_item_comparison?.find((x) => x.item_name === itemName);
+                          if (!c) return <td key={q.quote_id} className="py-2 px-3 text-center text-xs text-gray-300">—</td>;
+                          const badge = statusBadge[c.status] || { label: c.status, cls: 'text-gray-500 bg-gray-50' };
+                          return (
+                            <td key={q.quote_id} className="py-2 px-3 text-center">
+                              <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${badge.cls}`}>{badge.label}</span>
+                              {c.status !== 'not_quoted' && (
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                  Qty {c.quoted_quantity} · ₹{Number(c.unit_price || 0).toLocaleString('en-IN')}
+                                </p>
                               )}
                             </td>
                           );
