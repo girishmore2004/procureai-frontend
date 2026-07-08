@@ -37,6 +37,7 @@ import SettingsPage from './pages/SettingsPage';
 import AiAssistantPage from './pages/AiAssistantPage';
 import UsersPage from './pages/UsersPage';
 import FindVendorPage from './pages/FindVendorPage';
+import PlatformDashboardPage from './pages/PlatformDashboardPage';
 
 // Vendor portal pages (separate auth, no company Layout)
 import VendorPortalLoginPage from './pages/VendorPortalLoginPage';
@@ -121,6 +122,7 @@ export default function App() {
         <Route path="/settings"          element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="/ai-assistant"      element={<ProtectedRoute><AiAssistantPage /></ProtectedRoute>} />
         <Route path="/users"             element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
+        <Route path="/platform"          element={<ProtectedRoute><PlatformDashboardPage /></ProtectedRoute>} />
 
         {/* ── Fallback ─────────────────────────────────────────────────── */}
         {/* Unknown paths go to home page, NOT dashboard, so logged-out users
