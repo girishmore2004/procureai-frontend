@@ -228,3 +228,12 @@ export const publicApi = {
     return api.post(`/public/rfq/${token}/quote`, f, { headers: { 'Content-Type': 'multipart/form-data' } });
   },
 };
+
+// PLATFORM OWNER (cross-company, read-only — requires is_platform_admin)
+export const platformApi = {
+  getOverview: () => api.get('/platform/overview'),
+  getApprovalBottlenecks: () => api.get('/platform/approval-bottlenecks'),
+  getUsageTrends: () => api.get('/platform/usage-trends'),
+  getTopEntities: () => api.get('/platform/top-entities'),
+  getAlerts: () => api.get('/platform/alerts'),
+};
