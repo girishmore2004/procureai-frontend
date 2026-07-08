@@ -1,8 +1,19 @@
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL}/api/v1`
-  : '/api/v1';
+const API_ORIGIN = import.meta.env.VITE_API_URL || '';
+const API_BASE = `${API_ORIGIN}/api/v1`;
+
+// Backend endpoints that return stored files (invoice uploads, vendor quote
+// uploads) give back a relative path like "/files/procureai-uploads/xyz.pdf" —
+// the express.static mount on the API server, not the frontend's own origin.
+// Turn that into a URL the browser can actually open ("View File" / "View
+// Source File" links). Absolute URLs (S3, etc.) are passed through unchanged.
+export function toAbsoluteFileUrl(fileUrl) {
+  if (!fileUrl) return null;
+  if (/^https?:\/\//i.test(fileUrl)) return fileUrl;
+  if (fileUrl.startsWith('[buffer]')) return null; // legacy placeholder — no real file exists
+  return `${API_ORIGIN}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
+}
 
 const api = axios.create({
   baseURL: API_BASE,
