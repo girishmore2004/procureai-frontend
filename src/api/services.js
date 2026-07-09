@@ -393,7 +393,6 @@ export const invoicesApi = {
   getOne: (id) => api.get(`/invoices/${id}`),
   match: (id) => api.post(`/invoices/${id}/match`),
   approve: (id) => api.post(`/invoices/${id}/approve`),
-  markPaid: (id) => api.post(`/invoices/${id}/mark-paid`),
   queuePayment: (id, data) => api.post(`/invoices/${id}/queue-payment`, data),
   updateItem: (invoiceId, itemId, data) => api.patch(`/invoices/${invoiceId}/items/${itemId}`, data),
 };
