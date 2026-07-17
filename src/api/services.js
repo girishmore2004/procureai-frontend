@@ -62,6 +62,7 @@ export const vendorPortalApi = {
     return api.post('/vendor-portal/documents', f, { headers: { 'Content-Type': 'multipart/form-data' } });
   },
   listOrders: () => api.get('/vendor-portal/orders'),
+  listQuoteRequests: () => api.get('/vendor-portal/quote-requests'),
   listPayments: () => api.get('/vendor-portal/payments'),
   confirmPayment: (id) => api.post(`/vendor-portal/payments/${id}/confirm`),
 };
